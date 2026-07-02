@@ -1,12 +1,234 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-body {
-  background-color: #0a0a0a;
-  color: #f5f5f5;
+:root {
+  --bg: #0f1117;
+  --bg-phone: #eef0f4;
+  --header: #1c1f2e;
+  --card: #ffffff;
+  --card-muted: #f4f5f7;
+  --border: #e2e5eb;
+  --border-dark: #2a2d3a;
+  --text: #111827;
+  --text-on-dark: #f9fafb;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
+  --buyer: #2563eb;
+  --buyer-hover: #1d4ed8;
+  --buyer-light: #0891b2;
+  --seller: #16a34a;
+  --seller-hover: #15803d;
+  --live: #ef4444;
+  --nav-dark: #151820;
 }
 
-.neon-pink {
-  text-shadow: 0 0 15px #ff00aa;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-phone: var(--bg-phone);
+  --color-header: var(--header);
+  --color-card: var(--card);
+  --color-card-muted: var(--card-muted);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-buyer: var(--buyer);
+  --color-buyer-light: var(--buyer-light);
+  --color-seller: var(--seller);
+  --color-live: var(--live);
+  --color-nav-dark: var(--nav-dark);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up { animation: slide-up 0.35s ease-out both; }
+.animate-live-pulse { animation: live-pulse 1.4s ease-in-out infinite; }
+
+.phone-shell {
+  background: var(--bg-phone);
+  min-height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.5);
+}
+
+@media (min-width: 768px) {
+  body {
+    background: linear-gradient(135deg, #0f1117 0%, #1a1f35 100%);
+    min-height: 100dvh;
+  }
+
+  .phone-wrapper {
+    min-height: 100dvh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  .phone-shell {
+    width: 390px;
+    max-width: 390px;
+    min-height: 844px;
+    max-height: 90dvh;
+    margin-top: 0;
+    border-radius: 44px;
+    overflow: hidden;
+    border: 6px solid #1a1a1a;
+    box-shadow:
+      0 0 0 2px #333,
+      0 25px 80px rgba(0, 0, 0, 0.6);
+  }
+
+  .phone-notch {
+    display: block;
+  }
+}
+
+.phone-wrapper {
+  width: 100%;
+}
+
+.phone-notch {
+  display: none;
+  width: 120px;
+  height: 28px;
+  background: #1a1a1a;
+  border-radius: 0 0 18px 18px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 60;
+}
+
+.header-dark {
+  background: var(--header);
+  color: var(--text-on-dark);
+}
+
+.ui-card {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.btn-buyer {
+  background: var(--buyer);
+  color: white;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-buyer:hover { background: var(--buyer-hover); }
+.btn-buyer:active { transform: scale(0.98); }
+
+.btn-buyer-alt {
+  background: var(--buyer-light);
+  color: white;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: opacity 0.15s;
+}
+.btn-buyer-alt:hover { opacity: 0.9; }
+
+.btn-seller {
+  background: var(--seller);
+  color: white;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+.btn-seller:hover { background: var(--seller-hover); }
+
+.live-pill {
+  background: var(--live);
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.tab-active {
+  border-bottom: 3px solid var(--buyer);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.bottom-nav {
+  background: var(--nav-dark);
+  border-top: 1px solid var(--border-dark);
+}
+
+.nav-item-active { color: var(--buyer); }
+.nav-item { color: #6b7280; }
+
+.mode-pill {
+  border-radius: 999px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 2px;
+}
+
+.mode-pill button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mode-pill button.active-buyer {
+  background: var(--buyer);
+  color: white;
+}
+
+.mode-pill button.active-seller {
+  background: var(--seller);
+  color: white;
+}
+
+.search-bar {
+  background: var(--card-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+}
+
+.search-bar::placeholder { color: var(--text-3); }
+
+.duration-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text-2);
+  transition: all 0.15s;
+}
+
+.duration-pill.active {
+  background: var(--seller);
+  color: white;
+  border-color: var(--seller);
 }
