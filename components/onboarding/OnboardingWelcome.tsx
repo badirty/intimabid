@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { ShoppingBag, Store, Sparkles, ArrowLeftRight } from 'lucide-react';
 import type { PreferredMode } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import PhoneWrapper from '@/components/layout/PhoneWrapper';
-
 export default function OnboardingWelcome({
   userEmail,
   onComplete,
@@ -27,8 +25,11 @@ export default function OnboardingWelcome({
   };
 
   return (
-    <PhoneWrapper>
-    <div className="flex items-center justify-center p-6 min-h-[80dvh]">
+    <div className="app-shell">
+    <div
+      className="flex items-center justify-center p-6 flex-1 min-h-dvh"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="w-full animate-slide-up">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-buyer flex items-center justify-center text-white text-xl font-black mx-auto mb-4">B</div>
@@ -76,7 +77,7 @@ export default function OnboardingWelcome({
         <p className="text-center text-[11px] text-text-3 mt-6">Modifiable dans Profil →</p>
       </div>
     </div>
-    </PhoneWrapper>
+    </div>
   );
 }
 

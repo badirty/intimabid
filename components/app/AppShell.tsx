@@ -4,14 +4,12 @@ import { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Tab, PreferredMode, AppMode } from '@/lib/types';
 import { getInitialAppMode } from '@/lib/auth';
-import StatusBar from '@/components/layout/StatusBar';
 import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import BottomNav from '@/components/layout/BottomNav';
 import BuyerHome from '@/components/buyer/BuyerHome';
 import SellerDashboard from '@/components/seller/SellerDashboard';
 import ProfileScreen from '@/components/shared/ProfileScreen';
 import PlaceholderScreen from '@/components/shared/PlaceholderScreen';
-import PhoneWrapper from '@/components/layout/PhoneWrapper';
 
 export default function AppShell({
   user,
@@ -57,21 +55,19 @@ export default function AppShell({
   };
 
   return (
-    <PhoneWrapper>
-      <div className="pb-20 overflow-y-auto max-h-full">
-      <StatusBar />
-
-      {/* Mode switcher flottant */}
-      <div className="header-dark px-4 py-2 flex justify-center border-b border-white/5">
+    <div className="app-shell">
+      <div
+        className="header-dark px-4 py-2 flex justify-center border-b border-white/5 shrink-0"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+      >
         <ModeSwitcher mode={appMode} onChange={(m) => { setAppMode(m); setTab('home'); }} />
       </div>
 
-      <main className="min-h-0 flex-1">
+      <main className="flex-1 overflow-y-auto pb-20">
         {content()}
       </main>
 
       <BottomNav active={tab} onChange={setTab} />
-      </div>
-    </PhoneWrapper>
+    </div>
   );
 }

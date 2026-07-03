@@ -8,8 +8,6 @@ import type { PreferredMode } from '@/lib/types';
 import AuthPage from '@/components/auth/AuthPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
 import AppShell from '@/components/app/AppShell';
-import PhoneWrapper from '@/components/layout/PhoneWrapper';
-
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [onboarded, setOnboarded] = useState(false);
@@ -76,14 +74,14 @@ export default function Home() {
 
   if (loading) {
     return (
-      <PhoneWrapper>
-        <div className="flex flex-col items-center justify-center gap-4 min-h-[80dvh]">
+      <div className="app-shell">
+        <div className="flex flex-col items-center justify-center gap-4 flex-1 min-h-dvh">
           <div className="w-12 h-12 rounded-xl bg-buyer flex items-center justify-center text-lg font-black text-white animate-pulse">
             B
           </div>
           <p className="text-text-2 text-sm">Chargement...</p>
         </div>
-      </PhoneWrapper>
+      </div>
     );
   }
 

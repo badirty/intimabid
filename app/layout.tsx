@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={`${jakarta.variable} ${bricolage.variable} h-full antialiased`}>
-      <body className="min-h-full bg-bg text-text">{children}</body>
+      <body className="min-h-full bg-bg-phone text-text">{children}</body>
     </html>
   );
 }

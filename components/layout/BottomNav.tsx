@@ -18,8 +18,10 @@ export default function BottomNav({
   onChange: (t: Tab) => void;
 }) {
   return (
-    <nav className="bottom-nav fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] z-50"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav
+      className="bottom-nav fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="flex justify-around items-center py-2 px-2">
         {ITEMS.map(({ tab, icon: Icon, label }) => {
           const isActive = active === tab;

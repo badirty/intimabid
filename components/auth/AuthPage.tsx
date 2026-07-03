@@ -3,9 +3,8 @@
 import { useState, useEffect } from 'react';
 import type { Provider } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { getAuthRedirectUrl } from '@/lib/auth-redirect';
 import { GoogleIcon, XIcon } from '@/components/icons';
-import PhoneWrapper from '@/components/layout/PhoneWrapper';
-
 type AuthView = 'login' | 'signup';
 
 export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
@@ -27,9 +26,10 @@ export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void
   const signInWithProvider = async (provider: Provider) => {
     setLoading(provider);
     setError(null);
+    const redirectTo = getAuthRedirectUrl();
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo },
     });
     if (e) { setError(e.message); setLoading(null); }
   };
@@ -42,15 +42,18 @@ export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void
       const { error: e } = await supabase.auth.signInWithPassword({ email, password });
       if (e) setError(e.message); else onAuthSuccess?.();
     } else {
-      const { error: e } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
+      const { error: e } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
       if (e) setError(e.message); else alert('Compte créé ! Vérifie ton e-mail.');
     }
     setLoading(null);
   };
 
   return (
-    <PhoneWrapper>
-    <div className="flex items-center justify-center p-6 min-h-[80dvh]">
+    <div className="app-shell">
+    <div
+      className="flex items-center justify-center p-6 flex-1 min-h-dvh"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="w-full max-w-sm animate-slide-up">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-buyer flex items-center justify-center text-white text-2xl font-black mx-auto mb-4 shadow-lg">
@@ -101,6 +104,6 @@ export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void
         </div>
       </div>
     </div>
-    </PhoneWrapper>
+    </div>
   );
 }
