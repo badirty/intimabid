@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
+import {
+  stripeSecretKey,
+  stripeWebhookSecret,
+  supabaseAnonKey,
+  supabaseServiceRoleKey,
+  supabaseUrl,
+} from '@/lib/env';
 
 export async function POST(request: Request) {
-  const secret = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = stripeSecretKey;
+  const webhookSecret = stripeWebhookSecret;
   if (!secret || !webhookSecret) {
     return NextResponse.json({ error: 'Webhook non configuré' }, { status: 503 });
   }
@@ -29,9 +35,8 @@ export async function POST(request: Request) {
     const amountCents = parseInt(session.metadata?.amount_cents ?? '0', 10);
 
     if (userId && amountCents > 0) {
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const client = serviceKey
-        ? createClient(supabaseUrl, serviceKey)
+      const client = supabaseServiceRoleKey
+        ? createClient(supabaseUrl, supabaseServiceRoleKey)
         : createClient(supabaseUrl, supabaseAnonKey);
 
       const { data: wallet } = await client.from('wallets').select('*').eq('user_id', userId).maybeSingle();

@@ -17,6 +17,7 @@ export default function ProfileScreen({
   onModeChange,
   onPreferredModeChange,
   onWallet,
+  walletVersion = 0,
 }: {
   userId: string;
   email?: string;
@@ -26,13 +27,14 @@ export default function ProfileScreen({
   onModeChange: (m: AppMode) => void;
   onPreferredModeChange?: (m: PreferredMode) => void;
   onWallet?: () => void;
+  walletVersion?: number;
 }) {
   const name = email?.split('@')[0] ?? 'user';
   const [stats, setStats] = useState({ bids_count: 0, sales_count: 0, balance_cents: 0 });
 
   useEffect(() => {
     fetchUserStats(userId).then(setStats);
-  }, [userId]);
+  }, [userId, walletVersion]);
 
   const switchPreferred = async (mode: PreferredMode) => {
     await supabase.auth.updateUser({
@@ -53,7 +55,12 @@ export default function ProfileScreen({
         <p className="text-text-3 text-xs mt-2">Acheteur &amp; Vendeur</p>
       </div>
 
-      <button onClick={onWallet} className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:ring-2 hover:ring-buyer/20 transition-all">
+      <button
+        type="button"
+        onClick={() => onWallet?.()}
+        disabled={!onWallet}
+        className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:ring-2 hover:ring-buyer/20 transition-all disabled:opacity-50"
+      >
         <div className="w-10 h-10 rounded-xl bg-buyer/10 flex items-center justify-center">
           <Wallet className="w-5 h-5 text-buyer" />
         </div>

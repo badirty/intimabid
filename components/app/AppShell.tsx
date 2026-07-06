@@ -27,6 +27,7 @@ export default function AppShell({
   const [appMode, setAppMode] = useState<AppMode>(getInitialAppMode(preferredMode));
   const [tab, setTab] = useState<Tab>('home');
   const [notifCount, setNotifCount] = useState(0);
+  const [walletVersion, setWalletVersion] = useState(0);
 
   const refreshNotifs = useCallback(async () => {
     setNotifCount(await getUnreadNotificationCount(user.id));
@@ -44,9 +45,18 @@ export default function AppShell({
   }, [refreshNotifs]);
 
   const goWallet = () => setTab('wallet');
+  const bumpWallet = () => setWalletVersion((v) => v + 1);
 
   const content = () => {
-    if (tab === 'wallet') return <WalletScreen userId={user.id} />;
+    if (tab === 'wallet') {
+      return (
+        <WalletScreen
+          userId={user.id}
+          onBack={() => setTab('profile')}
+          onBalanceChange={bumpWallet}
+        />
+      );
+    }
     if (tab === 'profile') {
       return (
         <ProfileScreen
@@ -58,6 +68,7 @@ export default function AppShell({
           onModeChange={(m) => { setAppMode(m); setTab('home'); }}
           onPreferredModeChange={onPreferredModeChange}
           onWallet={goWallet}
+          walletVersion={walletVersion}
         />
       );
     }

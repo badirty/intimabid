@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
+import { siteUrl, stripeSecretKey, supabaseAnonKey, supabaseUrl } from '@/lib/env';
 
 export async function POST(request: Request) {
-  const secret = process.env.STRIPE_SECRET_KEY;
+  const secret = stripeSecretKey;
   if (!secret) {
     return NextResponse.json({ error: 'Stripe non configuré.' }, { status: 503 });
   }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(secret);
-    const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://badirty.fr';
+    const origin = siteUrl;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

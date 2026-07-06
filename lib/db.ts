@@ -200,11 +200,15 @@ export async function isDbReady(): Promise<boolean> {
 }
 
 export async function demoTopup(amountCents = 5000, userId?: string) {
-  const { error } = await supabase.rpc('demo_wallet_topup', { p_amount_cents: amountCents });
-  if (!error) return;
-
   const uid = userId ?? (await supabase.auth.getUser()).data.user?.id;
   if (!uid) throw new Error('Non connecté');
+
+  const before = (await fetchWallet(uid))?.balance_cents ?? 0;
+  const { error } = await supabase.rpc('demo_wallet_topup', { p_amount_cents: amountCents });
+  if (!error) {
+    const after = (await fetchWallet(uid))?.balance_cents ?? 0;
+    if (after > before) return;
+  }
 
   await ensureUserBootstrap(uid);
   const wallet = await fetchWallet(uid);

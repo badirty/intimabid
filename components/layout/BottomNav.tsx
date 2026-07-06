@@ -26,7 +26,7 @@ export default function BottomNav({
     >
       <div className="flex justify-around items-center py-2 px-2">
         {ITEMS.map(({ tab, icon: Icon, label }) => {
-          const isActive = active === tab;
+          const isActive = active === tab || (active === 'wallet' && tab === 'profile');
           return (
             <button
               key={tab}
