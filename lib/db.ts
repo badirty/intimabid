@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
 import type { Auction, Notification, UserStats, Wallet } from '@/lib/types';
 import { durationDaysToEndsAt, eurosToCents } from '@/lib/format';
 
@@ -7,7 +8,7 @@ export async function ensureUserBootstrap(userId: string, email?: string) {
   await supabase.from('profiles').upsert({ id: userId, display_name: name }, { onConflict: 'id' });
   const { data: w } = await supabase.from('wallets').select('user_id').eq('user_id', userId).maybeSingle();
   if (!w) {
-    await supabase.from('wallets').insert({ user_id: userId, balance_cents: 2000 });
+    await supabase.from('wallets').insert({ user_id: userId, balance_cents: signupBonusCents() });
   }
 }
 
@@ -200,6 +201,9 @@ export async function isDbReady(): Promise<boolean> {
 }
 
 export async function demoTopup(amountCents = 5000, userId?: string) {
+  if (!isDemoWalletEnabled()) {
+    throw new Error('Recharge démo désactivée. Utilise le paiement par carte.');
+  }
   const uid = userId ?? (await supabase.auth.getUser()).data.user?.id;
   if (!uid) throw new Error('Non connecté');
 

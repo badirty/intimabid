@@ -24,6 +24,7 @@ export default function WalletScreen({
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const [dbReady, setDbReady] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -62,7 +63,13 @@ export default function WalletScreen({
   }, [load, onBalanceChange]);
 
   useEffect(() => {
-    fetch('/api/stripe/status').then((r) => r.json()).then((d) => setStripeEnabled(!!d.enabled)).catch(() => {});
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((d) => {
+        setStripeEnabled(!!d.stripe);
+        setDemoEnabled(!!d.demoWallet);
+      })
+      .catch(() => {});
   }, []);
 
   const recharge = async (mode: 'demo' | 'stripe') => {
@@ -78,7 +85,7 @@ export default function WalletScreen({
         const w = await load();
         const newBalance = w?.balance_cents ?? 0;
         if (newBalance <= prevBalance) {
-          throw new Error('Recharge non appliquée. Vérifie les policies wallet dans Supabase (002_wallet_policies.sql).');
+          throw new Error('Recharge non appliquée. Vérifie app_settings dans Supabase.');
         }
         setMsg(`+${centsToEuros(cents)} € ajoutés ✨`);
         onBalanceChange?.();
@@ -104,6 +111,7 @@ export default function WalletScreen({
     }
   };
 
+  const canRecharge = stripeEnabled || demoEnabled;
   const displayBalance = initialLoading ? '...' : centsToEuros(balanceCents);
 
   return (
@@ -137,7 +145,7 @@ export default function WalletScreen({
         <div className="ui-card p-4 mb-4 border-amber-200 bg-amber-50/80">
           <p className="text-amber-800 text-sm font-semibold">Base de données à configurer</p>
           <p className="text-amber-700 text-xs mt-1">
-            Exécute le fichier <code className="text-[10px]">supabase/migrations/001_schema.sql</code> dans Supabase → SQL Editor.
+            Exécute les migrations SQL dans Supabase → SQL Editor.
           </p>
         </div>
       )}
@@ -146,30 +154,41 @@ export default function WalletScreen({
         <h2 className="font-bold text-sm mb-3 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-buyer" /> Recharger
         </h2>
-        <div className="flex gap-2 mb-4">
-          {['20', '50', '100'].map((v) => (
-            <button
-              key={v}
-              onClick={() => setTopupAmount(v)}
+
+        {!canRecharge && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-800">
+            Paiement par carte indisponible. Configure Stripe sur Vercel (voir procédure déploiement).
+          </div>
+        )}
+
+        {canRecharge && (
+          <>
+            <div className="flex gap-2 mb-4">
+              {['20', '50', '100'].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setTopupAmount(v)}
+                  disabled={busy}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
+                    topupAmount === v ? 'border-buyer bg-buyer/15 text-buyer' : 'border-border text-text-2'
+                  }`}
+                >
+                  {v} €
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={topupAmount}
+              onChange={(e) => setTopupAmount(e.target.value)}
               disabled={busy}
-              className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
-                topupAmount === v ? 'border-buyer bg-buyer/15 text-buyer' : 'border-border text-text-2'
-              }`}
-            >
-              {v} €
-            </button>
-          ))}
-        </div>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          value={topupAmount}
-          onChange={(e) => setTopupAmount(e.target.value)}
-          disabled={busy}
-          className="search-bar w-full px-4 py-3 text-sm mb-4 outline-none"
-          placeholder="Montant en €"
-        />
+              className="search-bar w-full px-4 py-3 text-sm mb-4 outline-none"
+              placeholder="Montant en €"
+            />
+          </>
+        )}
 
         {stripeEnabled && (
           <button
@@ -182,17 +201,19 @@ export default function WalletScreen({
           </button>
         )}
 
-        <button
-          onClick={() => recharge('demo')}
-          disabled={busy}
-          className={`w-full py-3.5 text-sm rounded-xl font-bold border disabled:opacity-60 ${
-            stripeEnabled
-              ? 'border-border text-text-2 hover:bg-card-muted'
-              : 'btn-buyer'
-          }`}
-        >
-          {busy ? 'Recharge…' : stripeEnabled ? 'Recharger (démo test)' : 'Recharger'}
-        </button>
+        {demoEnabled && (
+          <button
+            onClick={() => recharge('demo')}
+            disabled={busy}
+            className={`w-full py-3.5 text-sm rounded-xl font-bold border disabled:opacity-60 ${
+              stripeEnabled
+                ? 'border-border text-text-2 hover:bg-card-muted'
+                : 'btn-buyer'
+            }`}
+          >
+            {busy ? 'Recharge…' : stripeEnabled ? 'Recharger (démo test)' : 'Recharger'}
+          </button>
+        )}
       </div>
 
       <div className="min-h-[2.5rem] flex flex-col items-center justify-center gap-1 px-2">
