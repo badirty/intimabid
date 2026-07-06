@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Tab, PreferredMode, AppMode } from '@/lib/types';
 import { getInitialAppMode } from '@/lib/auth';
+import { getUnreadNotificationCount } from '@/lib/db';
 import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import BottomNav from '@/components/layout/BottomNav';
 import BuyerHome from '@/components/buyer/BuyerHome';
 import SellerDashboard from '@/components/seller/SellerDashboard';
 import ProfileScreen from '@/components/shared/ProfileScreen';
-import PlaceholderScreen from '@/components/shared/PlaceholderScreen';
+import WalletScreen from '@/components/wallet/WalletScreen';
+import NotificationsScreen from '@/components/notifications/NotificationsScreen';
 
 export default function AppShell({
   user,
@@ -24,34 +26,54 @@ export default function AppShell({
 }) {
   const [appMode, setAppMode] = useState<AppMode>(getInitialAppMode(preferredMode));
   const [tab, setTab] = useState<Tab>('home');
+  const [notifCount, setNotifCount] = useState(0);
+
+  const refreshNotifs = useCallback(async () => {
+    setNotifCount(await getUnreadNotificationCount(user.id));
+  }, [user.id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('wallet')) setTab('wallet');
+  }, []);
+
+  useEffect(() => { refreshNotifs(); }, [refreshNotifs]);
+  useEffect(() => {
+    const id = setInterval(refreshNotifs, 30000);
+    return () => clearInterval(id);
+  }, [refreshNotifs]);
+
+  const goWallet = () => setTab('wallet');
 
   const content = () => {
+    if (tab === 'wallet') return <WalletScreen userId={user.id} />;
     if (tab === 'profile') {
       return (
         <ProfileScreen
+          userId={user.id}
           email={user.email}
           appMode={appMode}
           preferredMode={preferredMode}
           onSignOut={onSignOut}
           onModeChange={(m) => { setAppMode(m); setTab('home'); }}
           onPreferredModeChange={onPreferredModeChange}
+          onWallet={goWallet}
         />
       );
     }
-
     if (tab === 'notifications') {
-      return <PlaceholderScreen emoji="🔔" title="Notifications" subtitle="Alertes d'enchères et messages" />;
+      return <NotificationsScreen userId={user.id} />;
     }
-
-    if (tab === 'favorites' && appMode === 'seller') {
-      return <PlaceholderScreen emoji="❤️" title="Favoris" subtitle="Tes articles sauvegardés" />;
-    }
-
     if (appMode === 'buyer') {
-      return <BuyerHome initialTab={tab === 'favorites' ? 'favorites' : 'live'} />;
+      return (
+        <BuyerHome
+          userId={user.id}
+          initialTab={tab === 'favorites' ? 'favorites' : 'live'}
+          onWalletNeeded={goWallet}
+        />
+      );
     }
-
-    return <SellerDashboard />;
+    return <SellerDashboard userId={user.id} onWallet={goWallet} />;
   };
 
   return (
@@ -67,7 +89,7 @@ export default function AppShell({
         {content()}
       </main>
 
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav active={tab} onChange={(t) => { setTab(t); if (t === 'notifications') refreshNotifs(); }} notifCount={notifCount} />
     </div>
   );
 }

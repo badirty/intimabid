@@ -13,9 +13,11 @@ const ITEMS: { tab: Tab; icon: typeof Home; label: string }[] = [
 export default function BottomNav({
   active,
   onChange,
+  notifCount = 0,
 }: {
   active: Tab;
   onChange: (t: Tab) => void;
+  notifCount?: number;
 }) {
   return (
     <nav
@@ -29,11 +31,16 @@ export default function BottomNav({
             <button
               key={tab}
               onClick={() => onChange(tab)}
-              className={`flex flex-col items-center gap-0.5 py-1.5 px-4 transition-colors ${
+              className={`relative flex flex-col items-center gap-0.5 py-1.5 px-4 transition-colors ${
                 isActive ? 'nav-item-active' : 'nav-item'
               }`}
             >
               <Icon className="w-5 h-5" fill={isActive && tab === 'favorites' ? 'currentColor' : 'none'} />
+              {tab === 'notifications' && notifCount > 0 && (
+                <span className="absolute top-0 right-2 min-w-[16px] h-4 bg-live text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                  {notifCount > 9 ? '9+' : notifCount}
+                </span>
+              )}
               <span className="text-[10px] font-semibold">{label}</span>
             </button>
           );

@@ -1,15 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Shirt } from 'lucide-react';
-import { ACTIVE_SALES } from '@/lib/data';
+import { centsToEuros, eurosToCents, IMAGE_COLORS } from '@/lib/format';
+import { createAuction, fetchSellerAuctions, fetchWallet, requestWithdrawal } from '@/lib/db';
 
-const DURATIONS = ['3j', '5j', '7j'] as const;
+const DURATIONS: Record<string, number> = { '3j': 3, '5j': 5, '7j': 7 };
 
-export default function SellerDashboard() {
-  const [duration, setDuration] = useState<(typeof DURATIONS)[number]>('5j');
+export default function SellerDashboard({
+  userId,
+  onWallet,
+}: {
+  userId: string;
+  onWallet?: () => void;
+}) {
+  const [duration, setDuration] = useState<'3j' | '5j' | '7j'>('5j');
   const [startPrice, setStartPrice] = useState(25);
-  const balance = 145;
+  const [title, setTitle] = useState('');
+  const [colorIdx, setColorIdx] = useState(0);
+  const [balanceCents, setBalanceCents] = useState(0);
+  const [sales, setSales] = useState<Awaited<ReturnType<typeof fetchSellerAuctions>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [w, s] = await Promise.all([fetchWallet(userId), fetchSellerAuctions(userId)]);
+      setBalanceCents(w?.balance_cents ?? 0);
+      setSales(s);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const launch = async () => {
+    if (!title.trim()) { setError('Donne un titre à ton article'); return; }
+    setCreating(true);
+    setError(null);
+    try {
+      await createAuction(
+        userId,
+        title.trim(),
+        eurosToCents(startPrice),
+        DURATIONS[duration],
+        IMAGE_COLORS[colorIdx],
+      );
+      setTitle('');
+      setToast('Enchère lancée !');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const withdraw = async () => {
+    if (balanceCents < 1000) { setError('Minimum 10 € pour retirer'); return; }
+    try {
+      await requestWithdrawal(balanceCents);
+      setToast('Demande de retrait envoyée');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const liveSales = sales.filter((s) => s.status === 'live');
+  const pastSales = sales.filter((s) => s.status !== 'live');
 
   return (
     <div className="animate-slide-up">
@@ -21,89 +84,103 @@ export default function SellerDashboard() {
       </div>
 
       <div className="px-4 py-4 space-y-5">
-        {/* Balance */}
+        {toast && <div className="bg-seller/10 text-seller text-sm font-semibold px-4 py-2 rounded-xl text-center">{toast}</div>}
+        {error && <div className="bg-red-50 text-red-500 text-sm px-4 py-2 rounded-xl">{error}</div>}
+
         <div className="ui-card px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-text-3 text-xs uppercase tracking-wider font-semibold">Solde disponible</p>
             <p className="text-3xl font-extrabold text-seller mt-1" style={{ fontFamily: 'var(--font-display)' }}>
-              {balance.toFixed(2)} €
+              {loading ? '...' : centsToEuros(balanceCents)} €
             </p>
           </div>
-          <button className="btn-seller px-4 py-2 text-sm rounded-full">
-            Retirer
-          </button>
+          <div className="flex flex-col gap-2">
+            <button onClick={withdraw} className="btn-seller px-4 py-2 text-sm rounded-full">Retirer</button>
+            <button onClick={onWallet} className="text-buyer text-xs font-bold">Portefeuille →</button>
+          </div>
         </div>
 
-        {/* Create auction */}
         <div className="ui-card p-5">
-          <h2 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-4">
-            Créer une enchère
-          </h2>
+          <h2 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-4">Créer une enchère</h2>
 
-          <button className="w-full border-2 border-dashed border-border rounded-xl py-8 flex flex-col items-center gap-2 hover:border-seller/50 transition-colors mb-4">
-            <div className="relative">
-              <Shirt className="w-10 h-10 text-text-3" />
-              <span className="absolute -top-1 -right-2 w-5 h-5 bg-seller text-white rounded-full text-xs font-bold flex items-center justify-center">+</span>
-            </div>
-            <span className="text-sm font-semibold text-text-2">Ajouter photos / vidéos</span>
+          <input
+            placeholder="Titre de l'article (ex: Ensemble lingerie noire)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="search-bar w-full px-4 py-3 text-sm mb-4 outline-none"
+          />
+
+          <button
+            type="button"
+            onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
+            className={`w-full rounded-xl py-8 flex flex-col items-center gap-2 mb-4 bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} relative overflow-hidden`}
+          >
+            <Shirt className="w-10 h-10 text-white/80" />
+            <span className="text-sm font-semibold text-white/90">Aperçu couleur · tap pour changer</span>
           </button>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-2">Prix de départ</span>
               <div className="flex items-center gap-2">
-                <button onClick={() => setStartPrice((p) => Math.max(10, p - 5))}
-                  className="w-8 h-8 rounded-lg border border-border font-bold text-text-2">−</button>
+                <button onClick={() => setStartPrice((p) => Math.max(10, p - 5))} className="w-8 h-8 rounded-lg border border-border font-bold text-text-2">−</button>
                 <span className="font-extrabold text-lg w-12 text-center">{startPrice} €</span>
-                <button onClick={() => setStartPrice((p) => p + 5)}
-                  className="w-8 h-8 rounded-lg border border-border font-bold text-text-2">+</button>
+                <button onClick={() => setStartPrice((p) => p + 5)} className="w-8 h-8 rounded-lg border border-border font-bold text-text-2">+</button>
               </div>
             </div>
 
             <div>
               <p className="text-sm text-text-2 mb-2">Durée</p>
               <div className="flex gap-2">
-                {DURATIONS.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDuration(d)}
-                    className={`duration-pill ${duration === d ? 'active' : ''}`}
-                  >
-                    {d}
-                  </button>
+                {(['3j', '5j', '7j'] as const).map((d) => (
+                  <button key={d} onClick={() => setDuration(d)} className={`duration-pill ${duration === d ? 'active' : ''}`}>{d}</button>
                 ))}
               </div>
             </div>
           </div>
 
-          <button className="btn-seller w-full py-4 text-sm mt-5 uppercase tracking-wide">
-            Lancer l&apos;enchère
+          <button onClick={launch} disabled={creating} className="btn-seller w-full py-4 text-sm mt-5 uppercase tracking-wide">
+            {creating ? 'Lancement...' : "Lancer l'enchère"}
           </button>
         </div>
 
-        {/* Active sales */}
         <div className="ui-card p-5">
-          <h2 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-4">
-            Mes ventes en cours
-          </h2>
-          <div className="space-y-3">
-            {ACTIVE_SALES.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <div>
-                  <p className="font-semibold text-sm text-text">{sale.title}</p>
-                  <p className="text-xs text-text-3">{sale.offers} offres</p>
+          <h2 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-4">Mes ventes en cours</h2>
+          {liveSales.length === 0 ? (
+            <p className="text-text-3 text-sm text-center py-4">Aucune vente active</p>
+          ) : (
+            <div className="space-y-3">
+              {liveSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div>
+                    <p className="font-semibold text-sm text-text">{sale.title}</p>
+                    <p className="text-xs text-text-3">{sale.bid_count ?? 0} offres · {centsToEuros(sale.current_price_cents)} €</p>
+                  </div>
+                  <span className="live-pill text-[10px]">LIVE</span>
                 </div>
-                <button className={`text-sm font-bold px-4 py-2 rounded-full ${
-                  sale.action === 'Booster'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-blue-50 text-buyer'
-                }`}>
-                  {sale.action}
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {pastSales.length > 0 && (
+          <div className="ui-card p-5">
+            <h2 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-4">Ventes terminées</h2>
+            <div className="space-y-3">
+              {pastSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div>
+                    <p className="font-semibold text-sm text-text">{sale.title}</p>
+                    <p className="text-xs text-text-3">{sale.bid_count ?? 0} offres</p>
+                  </div>
+                  <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-zinc-100 text-text-2">
+                    {sale.status === 'sold' ? 'Vendu' : 'Terminé'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

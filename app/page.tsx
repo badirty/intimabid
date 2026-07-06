@@ -8,6 +8,7 @@ import type { PreferredMode } from '@/lib/types';
 import AuthPage from '@/components/auth/AuthPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
 import AppShell from '@/components/app/AppShell';
+import { ensureUserBootstrap } from '@/lib/db';
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [onboarded, setOnboarded] = useState(false);
@@ -19,6 +20,7 @@ export default function Home() {
     if (sessionUser) {
       setOnboarded(hasCompletedOnboarding(sessionUser));
       setPreferredMode(getPreferredMode(sessionUser));
+      ensureUserBootstrap(sessionUser.id, sessionUser.email).catch(() => {});
     } else {
       setOnboarded(false);
     }

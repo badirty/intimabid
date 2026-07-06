@@ -1,25 +1,37 @@
 'use client';
 
-import { LogOut, ShoppingBag, Store, ArrowLeftRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LogOut, ShoppingBag, Store, ArrowLeftRight, Wallet } from 'lucide-react';
 import type { AppMode, PreferredMode } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { centsToEuros } from '@/lib/format';
+import { fetchUserStats } from '@/lib/db';
 
 export default function ProfileScreen({
+  userId,
   email,
   appMode,
   preferredMode,
   onSignOut,
   onModeChange,
   onPreferredModeChange,
+  onWallet,
 }: {
+  userId: string;
   email?: string;
   appMode: AppMode;
   preferredMode: PreferredMode;
   onSignOut: () => void;
   onModeChange: (m: AppMode) => void;
   onPreferredModeChange?: (m: PreferredMode) => void;
+  onWallet?: () => void;
 }) {
   const name = email?.split('@')[0] ?? 'user';
+  const [stats, setStats] = useState({ bids_count: 0, sales_count: 0, balance_cents: 0 });
+
+  useEffect(() => {
+    fetchUserStats(userId).then(setStats);
+  }, [userId]);
 
   const switchPreferred = async (mode: PreferredMode) => {
     await supabase.auth.updateUser({
@@ -39,6 +51,17 @@ export default function ProfileScreen({
         <p className="text-text-2 text-sm mt-1">{email}</p>
         <p className="text-text-3 text-xs mt-2">Acheteur &amp; Vendeur</p>
       </div>
+
+      <button onClick={onWallet} className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:ring-2 hover:ring-buyer/20 transition-all">
+        <div className="w-10 h-10 rounded-xl bg-buyer/10 flex items-center justify-center">
+          <Wallet className="w-5 h-5 text-buyer" />
+        </div>
+        <div className="text-left flex-1">
+          <p className="font-bold text-sm">Portefeuille</p>
+          <p className="text-seller font-extrabold">{centsToEuros(stats.balance_cents)} €</p>
+        </div>
+        <span className="text-text-3">→</span>
+      </button>
 
       <div className="ui-card p-4 mb-4">
         <p className="text-xs text-text-3 uppercase tracking-wider font-bold mb-3">Basculer d&apos;interface</p>
@@ -85,9 +108,9 @@ export default function ProfileScreen({
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { v: 8, l: 'Enchéries' },
-          { v: 12, l: 'Ventes' },
-          { v: '145€', l: 'Solde' },
+          { v: stats.bids_count, l: 'Enchères' },
+          { v: stats.sales_count, l: 'Ventes' },
+          { v: `${centsToEuros(stats.balance_cents)}€`, l: 'Solde' },
         ].map((s) => (
           <div key={s.l} className="ui-card p-3 text-center">
             <p className="font-extrabold text-lg">{s.v}</p>
