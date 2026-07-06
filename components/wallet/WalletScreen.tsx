@@ -7,6 +7,25 @@ import { demoTopup, fetchWallet, isDbReady } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import GhostLogo from '@/components/brand/GhostLogo';
 
+type AppConfig = {
+  stripe: boolean;
+  demoWallet: boolean;
+  stripeMissing?: string[];
+};
+
+async function fetchAppConfig(): Promise<AppConfig> {
+  const res = await fetch('/api/config', { cache: 'no-store' });
+  if (res.ok) return res.json();
+
+  const legacy = await fetch('/api/stripe/status', { cache: 'no-store' });
+  if (legacy.ok) {
+    const d = await legacy.json();
+    return { stripe: !!d.enabled, demoWallet: false };
+  }
+
+  return { stripe: false, demoWallet: false };
+}
+
 export default function WalletScreen({
   userId,
   onBack,
@@ -23,10 +42,13 @@ export default function WalletScreen({
   const [topupAmount, setTopupAmount] = useState('50');
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stripeEnabled, setStripeEnabled] = useState(false);
-  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [dbReady, setDbReady] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const stripeEnabled = !!config?.stripe;
+  const demoEnabled = !!config?.demoWallet;
+  const configLoading = config === null;
 
   const load = useCallback(async (opts?: { initial?: boolean }) => {
     const isInitial = opts?.initial ?? false;
@@ -48,6 +70,12 @@ export default function WalletScreen({
   useEffect(() => { load({ initial: true }); }, [load]);
 
   useEffect(() => {
+    fetchAppConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ stripe: false, demoWallet: false }));
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('wallet') === 'success') {
       setMsg('Paiement reçu ! Ton solde se met à jour…');
@@ -62,50 +90,63 @@ export default function WalletScreen({
     }
   }, [load, onBalanceChange]);
 
-  useEffect(() => {
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then((d) => {
-        setStripeEnabled(!!d.stripe);
-        setDemoEnabled(!!d.demoWallet);
-      })
-      .catch(() => {});
-  }, []);
-
   const recharge = async (mode: 'demo' | 'stripe') => {
     const cents = eurosToCents(parseFloat(topupAmount));
-    if (Number.isNaN(cents) || cents < 100) { setError('Minimum 1 €'); return; }
+    if (Number.isNaN(cents) || cents < 100) {
+      setError('Minimum 1 €');
+      return;
+    }
     setBusy(true);
     setError(null);
     setMsg(null);
     const prevBalance = balanceCents;
+
     try {
       if (mode === 'demo') {
         await demoTopup(cents, userId);
         const w = await load();
         const newBalance = w?.balance_cents ?? 0;
         if (newBalance <= prevBalance) {
-          throw new Error('Recharge non appliquée. Vérifie app_settings dans Supabase.');
+          throw new Error('Recharge démo refusée (désactivée en production).');
         }
         setMsg(`+${centsToEuros(cents)} € ajoutés ✨`);
         onBalanceChange?.();
-      } else {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Session expirée');
-        const res = await fetch('/api/stripe/checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ amount_cents: cents }),
-        });
-        const data = await res.json();
-        if (data.url) window.location.href = data.url;
-        else throw new Error(data.error ?? 'Erreur Stripe');
+        return;
       }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Session expirée — déconnecte-toi puis reconnecte-toi.');
+      }
+
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ amount_cents: cents }),
+      });
+
+      let data: { url?: string; error?: string; hint?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Erreur serveur (${res.status})`);
+      }
+
+      if (!res.ok) {
+        throw new Error([data.error, data.hint].filter(Boolean).join(' — '));
+      }
+
+      if (!data.url) {
+        throw new Error('Pas d’URL Stripe reçue. Vérifie la config Vercel.');
+      }
+
+      window.location.assign(data.url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur');
+      setError(e instanceof Error ? e.message : 'Erreur inconnue');
     } finally {
       setBusy(false);
     }
@@ -118,6 +159,7 @@ export default function WalletScreen({
     <div className="animate-slide-up px-4 py-4">
       {onBack && (
         <button
+          type="button"
           onClick={onBack}
           className="flex items-center gap-1.5 text-text-2 text-sm font-semibold mb-4 -ml-1 py-1"
         >
@@ -144,9 +186,7 @@ export default function WalletScreen({
       {!dbReady && (
         <div className="ui-card p-4 mb-4 border-amber-200 bg-amber-50/80">
           <p className="text-amber-800 text-sm font-semibold">Base de données à configurer</p>
-          <p className="text-amber-700 text-xs mt-1">
-            Exécute les migrations SQL dans Supabase → SQL Editor.
-          </p>
+          <p className="text-amber-700 text-xs mt-1">Exécute les migrations SQL dans Supabase.</p>
         </div>
       )}
 
@@ -155,9 +195,20 @@ export default function WalletScreen({
           <Sparkles className="w-4 h-4 text-buyer" /> Recharger
         </h2>
 
-        {!canRecharge && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-800">
-            Paiement par carte indisponible. Configure Stripe sur Vercel (voir procédure déploiement).
+        {configLoading && (
+          <p className="text-text-3 text-sm mb-4">Vérification du paiement…</p>
+        )}
+
+        {!configLoading && !canRecharge && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 space-y-2">
+            <p className="font-semibold">Paiement indisponible</p>
+            <p>Stripe n’est pas configuré sur Vercel.</p>
+            {config?.stripeMissing?.length ? (
+              <p className="text-xs font-mono bg-amber-100/80 rounded-lg px-2 py-1.5">
+                Manquant : {config.stripeMissing.join(', ')}
+              </p>
+            ) : null}
+            <p className="text-xs">Ajoute les clés Stripe dans Vercel → Settings → Environment Variables, puis redeploy.</p>
           </div>
         )}
 
@@ -167,6 +218,7 @@ export default function WalletScreen({
               {['20', '50', '100'].map((v) => (
                 <button
                   key={v}
+                  type="button"
                   onClick={() => setTopupAmount(v)}
                   disabled={busy}
                   className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
@@ -192,19 +244,21 @@ export default function WalletScreen({
 
         {stripeEnabled && (
           <button
+            type="button"
             onClick={() => recharge('stripe')}
-            disabled={busy}
+            disabled={busy || configLoading}
             className="btn-buyer w-full py-3.5 text-sm flex items-center justify-center gap-2 mb-2 disabled:opacity-60"
           >
             <CreditCard className="w-4 h-4" />
-            {busy ? 'Redirection…' : 'Payer par carte'}
+            {busy ? 'Redirection vers Stripe…' : 'Payer par carte'}
           </button>
         )}
 
         {demoEnabled && (
           <button
+            type="button"
             onClick={() => recharge('demo')}
-            disabled={busy}
+            disabled={busy || configLoading}
             className={`w-full py-3.5 text-sm rounded-xl font-bold border disabled:opacity-60 ${
               stripeEnabled
                 ? 'border-border text-text-2 hover:bg-card-muted'
@@ -216,9 +270,13 @@ export default function WalletScreen({
         )}
       </div>
 
-      <div className="min-h-[2.5rem] flex flex-col items-center justify-center gap-1 px-2">
+      <div className="min-h-[3rem] flex flex-col items-center justify-center gap-1 px-2">
         {msg && <p className="text-center text-sm text-seller font-semibold">{msg}</p>}
-        {error && <p className="text-center text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="text-center text-sm text-red-600 font-semibold bg-red-50 border border-red-200 rounded-xl px-3 py-2 w-full">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

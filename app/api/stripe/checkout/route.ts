@@ -1,24 +1,39 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { siteUrl, stripeSecretKey, supabaseAnonKey, supabaseUrl } from '@/lib/env';
+import { createClient as createServerSupabase } from '@/lib/supabase/server';
+import { siteUrl, stripeConfigStatus, stripeSecretKey, supabaseAnonKey, supabaseUrl } from '@/lib/env';
+
+async function resolveUser(request: Request) {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) return user;
+
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice(7);
+  const tokenClient = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user: tokenUser } } = await tokenClient.auth.getUser(token);
+  return tokenUser ?? null;
+}
 
 export async function POST(request: Request) {
-  const secret = stripeSecretKey;
-  if (!secret) {
-    return NextResponse.json({ error: 'Stripe non configuré.' }, { status: 503 });
+  const stripeStatus = stripeConfigStatus();
+  if (!stripeStatus.configured) {
+    return NextResponse.json(
+      {
+        error: 'Stripe non configuré sur le serveur.',
+        hint: `Variables manquantes sur Vercel : ${stripeStatus.missing.join(', ')}`,
+        missing: stripeStatus.missing,
+      },
+      { status: 503 },
+    );
   }
 
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
-    }
-
-    const token = authHeader.slice(7);
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Session invalide' }, { status: 401 });
+    const user = await resolveUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Session expirée — reconnecte-toi.' }, { status: 401 });
     }
 
     const { amount_cents } = await request.json();
@@ -27,8 +42,7 @@ export async function POST(request: Request) {
     }
 
     const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(secret);
-    const origin = siteUrl;
+    const stripe = new Stripe(stripeSecretKey!);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -40,8 +54,8 @@ export async function POST(request: Request) {
         },
         quantity: 1,
       }],
-      success_url: `${origin}/?wallet=success`,
-      cancel_url: `${origin}/?wallet=cancel`,
+      success_url: `${siteUrl}/?wallet=success`,
+      cancel_url: `${siteUrl}/?wallet=cancel`,
       metadata: {
         type: 'wallet_topup',
         user_id: user.id,
@@ -49,8 +63,13 @@ export async function POST(request: Request) {
       },
     });
 
+    if (!session.url) {
+      return NextResponse.json({ error: 'Stripe n’a pas renvoyé d’URL de paiement.' }, { status: 500 });
+    }
+
     return NextResponse.json({ url: session.url });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Erreur Stripe' }, { status: 500 });
+    const message = e instanceof Error ? e.message : 'Erreur Stripe';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

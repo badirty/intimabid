@@ -28,9 +28,13 @@ export const supabaseAnonKey = requirePublicEnv(
 export const stripePublishableKey = readEnv(
   'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_ST_BLISHABLE_KEY',
+  'NEXT_PUBLIC_STRIPE_KEY',
 );
 
-export const stripeSecretKey = readEnv('STRIPE_SECRET_KEY');
+export const stripeSecretKey = readEnv(
+  'STRIPE_SECRET_KEY',
+  'STRIPE_SK',
+);
 
 export const stripeWebhookSecret = readEnv('STRIPE_WEBHOOK_SECRET');
 
@@ -47,6 +51,13 @@ export function signupBonusCents(): number {
   return isDemoWalletEnabled() ? 2000 : 0;
 }
 
+export function stripeConfigStatus(): { configured: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!stripeSecretKey) missing.push('STRIPE_SECRET_KEY');
+  if (!stripePublishableKey) missing.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
+  return { configured: missing.length === 0, missing };
+}
+
 export function isStripeConfigured(): boolean {
-  return Boolean(stripeSecretKey && stripePublishableKey);
+  return stripeConfigStatus().configured;
 }

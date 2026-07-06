@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { isDemoWalletEnabled, isStripeConfigured } from '@/lib/env';
+import { isDemoWalletEnabled, stripeConfigStatus } from '@/lib/env';
 
 export async function GET() {
+  const stripe = stripeConfigStatus();
   return NextResponse.json({
-    stripe: isStripeConfigured(),
+    stripe: stripe.configured,
     demoWallet: isDemoWalletEnabled(),
+    stripeMissing: stripe.missing,
   });
 }
