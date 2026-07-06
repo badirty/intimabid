@@ -194,9 +194,56 @@ export async function fetchWallet(userId: string): Promise<Wallet | null> {
   return data;
 }
 
-export async function demoTopup(amountCents = 5000) {
+export async function isDbReady(): Promise<boolean> {
+  const { error } = await supabase.from('wallets').select('user_id').limit(1);
+  return !error || error.code !== '42P01';
+}
+
+export async function demoTopup(amountCents = 5000, userId?: string) {
   const { error } = await supabase.rpc('demo_wallet_topup', { p_amount_cents: amountCents });
-  if (error) throw new Error(error.message);
+  if (!error) return;
+
+  const uid = userId ?? (await supabase.auth.getUser()).data.user?.id;
+  if (!uid) throw new Error('Non connecté');
+
+  await ensureUserBootstrap(uid);
+  const wallet = await fetchWallet(uid);
+  const newBalance = (wallet?.balance_cents ?? 0) + amountCents;
+
+  const { error: upErr } = await supabase
+    .from('wallets')
+    .upsert({ user_id: uid, balance_cents: newBalance, pending_cents: wallet?.pending_cents ?? 0 });
+
+  if (upErr) {
+    if (upErr.code === '42P01') {
+      throw new Error('Base de données non configurée. Exécute supabase/migrations/001_schema.sql dans Supabase.');
+    }
+    throw new Error(upErr.message);
+  }
+
+  await supabase.from('wallet_transactions').insert({
+    user_id: uid,
+    type: 'topup_demo',
+    amount_cents: amountCents,
+    description: 'Recharge démo',
+  }).then(() => {});
+}
+
+export async function creditWallet(userId: string, amountCents: number, type: 'topup_stripe' | 'topup_demo' = 'topup_stripe') {
+  await ensureUserBootstrap(userId);
+  const wallet = await fetchWallet(userId);
+  const newBalance = (wallet?.balance_cents ?? 0) + amountCents;
+  await supabase.from('wallets').upsert({
+    user_id: userId,
+    balance_cents: newBalance,
+    pending_cents: wallet?.pending_cents ?? 0,
+  });
+  await supabase.from('wallet_transactions').insert({
+    user_id: userId,
+    type,
+    amount_cents: amountCents,
+    description: type === 'topup_stripe' ? 'Recharge Stripe' : 'Recharge démo',
+  });
 }
 
 export async function requestWithdrawal(amountCents: number) {

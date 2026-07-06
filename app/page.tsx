@@ -9,6 +9,8 @@ import AuthPage from '@/components/auth/AuthPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
 import AppShell from '@/components/app/AppShell';
 import { ensureUserBootstrap } from '@/lib/db';
+import GhostLogo from '@/components/brand/GhostLogo';
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [onboarded, setOnboarded] = useState(false);
@@ -78,8 +80,8 @@ export default function Home() {
     return (
       <div className="app-shell">
         <div className="flex flex-col items-center justify-center gap-4 flex-1 min-h-dvh">
-          <div className="w-12 h-12 rounded-xl bg-buyer flex items-center justify-center text-lg font-black text-white animate-pulse">
-            B
+          <div className="ghost-logo-wrap w-14 h-14 rounded-2xl flex items-center justify-center animate-ghost-float">
+            <GhostLogo size={36} />
           </div>
           <p className="text-text-2 text-sm">Chargement...</p>
         </div>

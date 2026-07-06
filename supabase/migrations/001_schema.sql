@@ -209,8 +209,10 @@ create policy "profiles insert own" on public.profiles for insert with check (au
 
 create policy "wallets read own" on public.wallets for select using (auth.uid() = user_id);
 create policy "wallets insert own" on public.wallets for insert with check (auth.uid() = user_id);
+create policy "wallets update own" on public.wallets for update using (auth.uid() = user_id);
 
 create policy "wallet_tx read own" on public.wallet_transactions for select using (auth.uid() = user_id);
+create policy "wallet_tx insert own" on public.wallet_transactions for insert with check (auth.uid() = user_id);
 
 create policy "auctions read all" on public.auctions for select using (true);
 create policy "auctions insert own" on public.auctions for insert with check (auth.uid() = seller_id);

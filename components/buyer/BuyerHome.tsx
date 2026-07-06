@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Search, Flame, Heart } from 'lucide-react';
+import GhostLogo from '@/components/brand/GhostLogo';
 import type { Auction } from '@/lib/types';
 import { centsToEuros, isAuctionLive } from '@/lib/format';
 import { fetchEndedAuctions, fetchFavorites, fetchLiveAuctions, placeBid, toggleFavorite } from '@/lib/db';
@@ -204,7 +205,9 @@ function AuctionCard({
         >
           <Heart className={`w-4 h-4 ${item.is_favorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
         </button>
-        <div className="absolute inset-0 flex items-center justify-center opacity-20 text-6xl">👙</div>
+        <div className="absolute inset-0 flex items-center justify-center opacity-30">
+          <GhostLogo size={featured ? 72 : 48} />
+        </div>
       </div>
 
       <div className="p-4">

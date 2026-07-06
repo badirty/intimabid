@@ -7,7 +7,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#1c1f2e',
+  themeColor: '#1a1528',
 };
 
 const jakarta = Plus_Jakarta_Sans({

@@ -5,6 +5,7 @@ import type { Provider } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/auth-redirect';
 import { GoogleIcon, XIcon } from '@/components/icons';
+import GhostLogo from '@/components/brand/GhostLogo';
 type AuthView = 'login' | 'signup';
 
 export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
@@ -56,11 +57,11 @@ export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void
     >
       <div className="w-full max-w-sm animate-slide-up">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-buyer flex items-center justify-center text-white text-2xl font-black mx-auto mb-4 shadow-lg">
-            B
+          <div className="ghost-logo-wrap w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-ghost-float">
+            <GhostLogo size={52} />
           </div>
           <h1 className="text-3xl font-extrabold text-text" style={{ fontFamily: 'var(--font-display)' }}>badirty</h1>
-          <p className="text-text-2 text-sm mt-2">Enchères intimes en direct</p>
+          <p className="text-text-2 text-sm mt-2">Enchères privées · vibe ghost</p>
         </div>
 
         <div className="ui-card p-6">

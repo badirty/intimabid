@@ -26,12 +26,12 @@ export function isAuctionLive(status: string, endsAt: string): boolean {
 }
 
 export const IMAGE_COLORS = [
-  'from-rose-400 via-pink-300 to-red-400',
-  'from-zinc-700 via-zinc-800 to-black',
-  'from-slate-600 to-slate-800',
-  'from-fuchsia-900 to-purple-950',
-  'from-amber-600 to-orange-800',
-  'from-emerald-600 to-teal-800',
+  'from-violet-300 via-purple-200 to-fuchsia-200',
+  'from-indigo-300 via-violet-200 to-purple-100',
+  'from-teal-200 via-cyan-100 to-emerald-100',
+  'from-pink-200 via-rose-100 to-violet-100',
+  'from-slate-300 via-purple-100 to-indigo-100',
+  'from-amber-100 via-orange-100 to-pink-100',
 ] as const;
 
 export function durationDaysToEndsAt(days: number): string {

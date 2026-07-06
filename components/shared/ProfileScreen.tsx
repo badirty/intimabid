@@ -6,6 +6,7 @@ import type { AppMode, PreferredMode } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { centsToEuros } from '@/lib/format';
 import { fetchUserStats } from '@/lib/db';
+import GhostLogo from '@/components/brand/GhostLogo';
 
 export default function ProfileScreen({
   userId,
@@ -44,8 +45,8 @@ export default function ProfileScreen({
   return (
     <div className="animate-slide-up px-4 py-6">
       <div className="ui-card p-6 text-center mb-4">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-buyer to-buyer-light flex items-center justify-center text-2xl font-extrabold text-white mx-auto mb-4">
-          {name[0]?.toUpperCase()}
+        <div className="ghost-logo-wrap w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <GhostLogo size={48} />
         </div>
         <h2 className="font-extrabold text-xl" style={{ fontFamily: 'var(--font-display)' }}>@{name}</h2>
         <p className="text-text-2 text-sm mt-1">{email}</p>

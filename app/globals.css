@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0f1117;
-  --bg-phone: #eef0f4;
-  --header: #1c1f2e;
-  --card: #ffffff;
-  --card-muted: #f4f5f7;
-  --border: #e2e5eb;
-  --border-dark: #2a2d3a;
-  --text: #111827;
-  --text-on-dark: #f9fafb;
-  --text-2: #6b7280;
-  --text-3: #9ca3af;
-  --buyer: #2563eb;
-  --buyer-hover: #1d4ed8;
-  --buyer-light: #0891b2;
-  --seller: #16a34a;
-  --seller-hover: #15803d;
-  --live: #ef4444;
-  --nav-dark: #151820;
+  --bg: #110e1a;
+  --bg-phone: #ebe6f5;
+  --header: #1a1528;
+  --card: rgba(255, 255, 255, 0.92);
+  --card-muted: #f3effa;
+  --border: #ddd6f3;
+  --border-dark: #2a2438;
+  --text: #1e1a2e;
+  --text-on-dark: #f5f0ff;
+  --text-2: #6b6280;
+  --text-3: #9b92b0;
+  --buyer: #9b8fd9;
+  --buyer-hover: #8578c9;
+  --buyer-light: #b8a9e8;
+  --seller: #6ec9b8;
+  --seller-hover: #5bb8a7;
+  --live: #e8a0b4;
+  --nav-dark: #14101f;
+  --ghost-glow: rgba(167, 139, 250, 0.25);
 }
 
 @theme inline {
@@ -50,7 +51,7 @@ body {
 
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50% { opacity: 0.65; }
 }
 
 @keyframes slide-up {
@@ -58,11 +59,17 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes ghost-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 .animate-slide-up { animation: slide-up 0.35s ease-out both; }
-.animate-live-pulse { animation: live-pulse 1.4s ease-in-out infinite; }
+.animate-live-pulse { animation: live-pulse 1.6s ease-in-out infinite; }
+.animate-ghost-float { animation: ghost-float 3s ease-in-out infinite; }
 
 .app-shell {
-  background: var(--bg-phone);
+  background: linear-gradient(180deg, #ebe6f5 0%, #e4ddf0 100%);
   min-height: 100dvh;
   width: 100%;
   max-width: 430px;
@@ -74,82 +81,82 @@ body {
 
 @media (min-width: 768px) {
   body {
-    background: linear-gradient(135deg, #0f1117 0%, #1a1f35 100%);
+    background: linear-gradient(135deg, #110e1a 0%, #1f1835 50%, #110e1a 100%);
   }
 
   .app-shell {
     min-height: 100dvh;
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0 80px var(--ghost-glow);
+    border-radius: 0;
   }
 }
 
 .header-dark {
-  background: var(--header);
+  background: linear-gradient(180deg, #1f1835 0%, var(--header) 100%);
   color: var(--text-on-dark);
 }
 
 .ui-card {
   background: var(--card);
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(110, 90, 160, 0.08);
+  backdrop-filter: blur(8px);
 }
 
 .btn-buyer {
-  background: var(--buyer);
+  background: linear-gradient(135deg, var(--buyer) 0%, var(--buyer-light) 100%);
   color: white;
   font-weight: 700;
-  border-radius: 12px;
-  transition: background 0.15s, transform 0.1s;
+  border-radius: 14px;
+  transition: opacity 0.15s, transform 0.1s;
+  box-shadow: 0 4px 14px rgba(155, 143, 217, 0.35);
 }
-.btn-buyer:hover { background: var(--buyer-hover); }
+.btn-buyer:hover { opacity: 0.92; }
 .btn-buyer:active { transform: scale(0.98); }
 
 .btn-buyer-alt {
-  background: var(--buyer-light);
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
   color: white;
   font-weight: 700;
-  border-radius: 12px;
+  border-radius: 14px;
   transition: opacity 0.15s;
 }
 .btn-buyer-alt:hover { opacity: 0.9; }
 
 .btn-seller {
-  background: var(--seller);
-  color: white;
+  background: linear-gradient(135deg, var(--seller) 0%, #8ed9cc 100%);
+  color: #0f2a24;
   font-weight: 700;
-  border-radius: 12px;
-  transition: background 0.15s;
+  border-radius: 14px;
+  transition: opacity 0.15s;
+  box-shadow: 0 4px 14px rgba(110, 201, 184, 0.3);
 }
-.btn-seller:hover { background: var(--seller-hover); }
+.btn-seller:hover { opacity: 0.92; }
 
 .live-pill {
-  background: var(--live);
-  color: white;
+  background: linear-gradient(135deg, var(--live) 0%, #f0b4c8 100%);
+  color: #4a2030;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.05em;
   padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.tab-active {
-  border-bottom: 3px solid var(--buyer);
-  color: var(--text);
-  font-weight: 700;
+  border-radius: 999px;
 }
 
 .bottom-nav {
-  background: var(--nav-dark);
+  background: rgba(20, 16, 31, 0.96);
   border-top: 1px solid var(--border-dark);
+  backdrop-filter: blur(12px);
 }
 
-.nav-item-active { color: var(--buyer); }
-.nav-item { color: #6b7280; }
+.nav-item-active { color: var(--buyer-light); }
+.nav-item { color: #7a7190; }
 
 .mode-pill {
   border-radius: 999px;
   padding: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   display: flex;
   gap: 2px;
 }
@@ -160,23 +167,23 @@ body {
   font-size: 12px;
   font-weight: 700;
   transition: all 0.2s;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .mode-pill button.active-buyer {
-  background: var(--buyer);
+  background: linear-gradient(135deg, var(--buyer), var(--buyer-light));
   color: white;
 }
 
 .mode-pill button.active-seller {
-  background: var(--seller);
-  color: white;
+  background: linear-gradient(135deg, var(--seller), #8ed9cc);
+  color: #0f2a24;
 }
 
 .search-bar {
   background: var(--card-muted);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--text);
 }
 
@@ -194,7 +201,13 @@ body {
 }
 
 .duration-pill.active {
-  background: var(--seller);
-  color: white;
-  border-color: var(--seller);
+  background: linear-gradient(135deg, var(--seller), #8ed9cc);
+  color: #0f2a24;
+  border-color: transparent;
+}
+
+.ghost-logo-wrap {
+  background: linear-gradient(145deg, #f3effa 0%, #ddd6fe 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px var(--ghost-glow);
 }

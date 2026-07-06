@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { ShoppingBag, Store, Sparkles, ArrowLeftRight } from 'lucide-react';
 import type { PreferredMode } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import GhostLogo from '@/components/brand/GhostLogo';
+
 export default function OnboardingWelcome({
   userEmail,
   onComplete,
@@ -32,9 +34,11 @@ export default function OnboardingWelcome({
     >
       <div className="w-full animate-slide-up">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-buyer flex items-center justify-center text-white text-xl font-black mx-auto mb-4">B</div>
+          <div className="ghost-logo-wrap w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-ghost-float">
+            <GhostLogo size={40} />
+          </div>
           <h1 className="text-2xl font-extrabold text-text" style={{ fontFamily: 'var(--font-display)' }}>
-            Bienvenue {name} 👋
+            Bienvenue {name}
           </h1>
           <p className="text-text-2 text-sm mt-2 leading-relaxed">
             Tu peux <strong>acheter et vendre</strong> sur badirty.
