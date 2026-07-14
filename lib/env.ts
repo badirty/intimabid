@@ -20,10 +20,19 @@ function requirePublicEnv(...keys: string[]): string {
 export const supabaseUrl =
   readEnv('NEXT_PUBLIC_SUPABASE_URL') ?? 'https://cmtijlciwosbpzokndnp.supabase.co';
 
-export const supabaseAnonKey = requirePublicEnv(
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'NEXT_PUBLIC_SU_BASE_ANON_KEY',
-);
+export const supabaseAnonKey =
+  readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SU_BASE_ANON_KEY') ?? '';
+
+/** Vérifie que la clé anon est bien configurée (appelé côté client après hydratation). */
+export function ensureAnonKey(): string {
+  if (!supabaseAnonKey) {
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY manquante — copie .env.local.example vers .env.local');
+    }
+    throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY manquante — configure-la sur Vercel');
+  }
+  return supabaseAnonKey;
+}
 
 export const stripePublishableKey = readEnv(
   'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
