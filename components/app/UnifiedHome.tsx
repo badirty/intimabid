@@ -1,19 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Flame, Heart, Plus, Camera, X, Clock } from 'lucide-react';
+import { Search, Flame, Heart, Plus, Camera, X, Clock, User, Store } from 'lucide-react';
 import GhostLogo from '@/components/brand/GhostLogo';
-import type { Auction } from '@/lib/types';
+import type { Auction, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, eurosToCents, isAuctionLive } from '@/lib/format';
 import {
   fetchEndedAuctions, fetchFavorites, fetchLiveAuctions, fetchSellerAuctions,
-  placeBid, toggleFavorite, createAuction, uploadAuctionImage,
+  placeBid, toggleFavorite, createAuction, uploadAuctionImage, searchSellers,
 } from '@/lib/db';
 import { useCountdown } from '@/hooks/useCountdown';
 import BidModal from '@/components/buyer/BidModal';
 import AuctionDetail from '@/components/buyer/AuctionDetail';
+import SellerShop from '@/components/buyer/SellerShop';
 
 type HomeTab = 'live' | 'selling' | 'ended';
+type SearchMode = 'items' | 'sellers';
 const DURATION_PRESETS = [
   { label: '12h', hours: 12 },
   { label: '24h', hours: 24 },
@@ -28,7 +30,11 @@ export default function UnifiedHome({
   onWalletNeeded?: () => void;
 }) {
   const [tab, setTab] = useState<HomeTab>('live');
+  const [searchMode, setSearchMode] = useState<SearchMode>('items');
   const [search, setSearch] = useState('');
+  const [sellerResults, setSellerResults] = useState<SellerSearchResult[]>([]);
+  const [sellerSearchLoading, setSellerSearchLoading] = useState(false);
+  const [selectedSeller, setSelectedSeller] = useState<SellerSearchResult | null>(null);
   const [live, setLive] = useState<Auction[]>([]);
   const [ended, setEnded] = useState<Auction[]>([]);
   const [favorites, setFavorites] = useState<Auction[]>([]);
@@ -67,10 +73,11 @@ export default function UnifiedHome({
 
   const load = useCallback(async () => {
     setLoading(true);
+    const itemSearch = searchMode === 'items' ? search : '';
     try {
       const [liveData, endedData, favData, salesData] = await Promise.all([
-        fetchLiveAuctions(userId, search),
-        fetchEndedAuctions(search),
+        fetchLiveAuctions(userId, itemSearch),
+        fetchEndedAuctions(itemSearch),
         fetchFavorites(userId),
         fetchSellerAuctions(userId),
       ]);
@@ -83,9 +90,31 @@ export default function UnifiedHome({
     } finally {
       setLoading(false);
     }
-  }, [userId, search]);
+  }, [userId, search, searchMode]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (searchMode !== 'sellers') {
+      setSellerResults([]);
+      return;
+    }
+    const q = search.trim();
+    if (!q) {
+      setSellerResults([]);
+      setSellerSearchLoading(false);
+      return;
+    }
+    setSellerSearchLoading(true);
+    const t = setTimeout(() => {
+      searchSellers(q)
+        .then(setSellerResults)
+        .catch(() => setSellerResults([]))
+        .finally(() => setSellerSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, searchMode]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
@@ -153,6 +182,20 @@ export default function UnifiedHome({
     );
   }
 
+  if (selectedSeller) {
+    return (
+      <SellerShop
+        seller={selectedSeller}
+        userId={userId}
+        onBack={() => setSelectedSeller(null)}
+        onOpenAuction={(auction) => setDetailAuction(auction)}
+      />
+    );
+  }
+
+  const isSellerMode = searchMode === 'sellers';
+  const sellerQuery = search.trim();
+
   return (
     <div className="animate-slide-up relative">
       <div className="header-dark px-5 pt-2 pb-0">
@@ -171,22 +214,95 @@ export default function UnifiedHome({
       </div>
 
       <div className="px-4 py-4 space-y-4">
+        <div className="flex gap-2 p-1 rounded-xl bg-white/5 border border-white/8">
+          {([
+            ['items', 'Articles'],
+            ['sellers', 'Vendeurs'],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => {
+                setSearchMode(mode);
+                if (mode === 'items') setSellerResults([]);
+              }}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                searchMode === mode
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-white/50 hover:text-white/70'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-3" />
-          <input type="search" placeholder="Rechercher un article..." value={search}
-            onChange={(e) => setSearch(e.target.value)} className="search-bar w-full py-3.5 pl-11 pr-4 text-sm" />
+          <input
+            type="search"
+            placeholder={searchMode === 'sellers' ? 'Rechercher un vendeur...' : 'Rechercher un article...'}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-bar w-full py-3.5 pl-11 pr-4 text-sm"
+          />
         </div>
 
         {toast && <div className="bg-accent/10 text-accent text-sm font-bold px-4 py-2.5 rounded-2xl text-center border border-accent/20">{toast}</div>}
 
-        {loading && (
+        {isSellerMode && !sellerQuery && (
+          <div className="ui-card p-6 text-center">
+            <Store className="w-8 h-8 text-accent mx-auto mb-2" />
+            <p className="font-bold text-text text-sm">Trouver un vendeur</p>
+            <p className="text-text-3 text-xs mt-1">Tape son pseudo pour voir sa boutique</p>
+          </div>
+        )}
+
+        {isSellerMode && sellerQuery && sellerSearchLoading && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="ghost-logo-wrap w-10 h-10 rounded-xl flex items-center justify-center animate-ghost-float">
+              <GhostLogo size={26} />
+            </div>
+            <p className="text-text-3 text-sm">Recherche vendeurs...</p>
+          </div>
+        )}
+
+        {isSellerMode && sellerQuery && !sellerSearchLoading && sellerResults.length === 0 && (
+          <div className="ui-card p-8 text-center">
+            <p className="text-4xl mb-3">🔍</p>
+            <p className="font-bold text-text">Aucun vendeur trouvé</p>
+            <p className="text-text-3 text-sm mt-2">Essaie un autre pseudo</p>
+          </div>
+        )}
+
+        {isSellerMode && sellerQuery && !sellerSearchLoading && sellerResults.map((seller) => (
+          <button
+            key={seller.id}
+            type="button"
+            onClick={() => setSelectedSeller(seller)}
+            className="ui-card w-full p-4 flex items-center gap-3 text-left hover:border-accent/30 transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+              <User className="w-5 h-5 text-accent" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-text truncate">@{seller.display_name}</p>
+              <p className="text-text-3 text-xs mt-0.5">
+                {seller.live_count} live · {seller.total_sales} vente{seller.total_sales !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <Store className="w-4 h-4 text-text-3 shrink-0" />
+          </button>
+        ))}
+
+        {!isSellerMode && loading && (
           <div className="flex flex-col items-center gap-3 py-12">
             <div className="ghost-logo-wrap w-10 h-10 rounded-xl flex items-center justify-center animate-ghost-float"><GhostLogo size={26} /></div>
             <p className="text-text-3 text-sm">Chargement...</p>
           </div>
         )}
 
-        {!loading && items.length === 0 && (
+        {!isSellerMode && !loading && items.length === 0 && (
           <div className="ui-card p-10 text-center">
             <p className="text-4xl mb-3">{{live:'🕯️',selling:'📦',ended:'✨'}[tab]}</p>
             <p className="font-bold text-text text-lg">{{live:'Aucune enchère live',selling:'Aucune vente en cours',ended:'Aucune vente terminée'}[tab]}</p>
@@ -196,7 +312,7 @@ export default function UnifiedHome({
           </div>
         )}
 
-        {!loading && items.map((item, i) => (
+        {!isSellerMode && !loading && items.map((item, i) => (
           <AuctionCard key={item.id} item={item} featured={i === 0 && tab === 'live'}
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}

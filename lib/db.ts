@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
-import type { Auction, Notification, UserStats, Wallet } from '@/lib/types';
+import type { Auction, Notification, SellerSearchResult, UserStats, Wallet } from '@/lib/types';
 import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
 export async function ensureUserBootstrap(userId: string, email?: string) {
@@ -53,6 +53,62 @@ export async function fetchEndedAuctions(search = ''): Promise<Auction[]> {
     throw error;
   }
   return enrichAuctions(data ?? []);
+}
+
+export async function searchSellers(query: string): Promise<SellerSearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .ilike('display_name', `%${q}%`)
+    .limit(20);
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+  if (!profiles?.length) return [];
+
+  const ids = profiles.map((p) => p.id);
+  const { data: auctions } = await supabase
+    .from('auctions')
+    .select('seller_id, status')
+    .in('seller_id', ids);
+
+  const liveCount: Record<string, number> = {};
+  const salesCount: Record<string, number> = {};
+  for (const a of auctions ?? []) {
+    if (a.status === 'live') liveCount[a.seller_id] = (liveCount[a.seller_id] ?? 0) + 1;
+    if (a.status === 'sold') salesCount[a.seller_id] = (salesCount[a.seller_id] ?? 0) + 1;
+  }
+
+  return profiles
+    .map((p) => ({
+      id: p.id,
+      display_name: p.display_name ?? 'Vendeur',
+      live_count: liveCount[p.id] ?? 0,
+      total_sales: salesCount[p.id] ?? 0,
+    }))
+    .sort((a, b) => b.live_count - a.live_count || a.display_name.localeCompare(b.display_name));
+}
+
+export async function fetchLiveAuctionsBySeller(sellerId: string, userId?: string): Promise<Auction[]> {
+  await closeExpiredAuctions();
+  const { data, error } = await supabase
+    .from('auctions')
+    .select('*')
+    .eq('seller_id', sellerId)
+    .eq('status', 'live')
+    .gt('ends_at', new Date().toISOString())
+    .order('ends_at', { ascending: true });
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+  return enrichAuctions(data ?? [], userId);
 }
 
 export async function fetchFavorites(userId: string): Promise<Auction[]> {

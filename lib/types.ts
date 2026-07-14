@@ -46,6 +46,13 @@ export interface UserStats {
   balance_cents: number;
 }
 
+export interface SellerSearchResult {
+  id: string;
+  display_name: string;
+  live_count: number;
+  total_sales: number;
+}
+
 /** @deprecated use Auction */
 export type LiveAuction = {
   id: string | number;
