@@ -259,7 +259,7 @@ export default function UnifiedHome({
           onClick={() => setShowCreate(false)}
         >
           <div
-            className="w-full max-w-[430px] ui-card mx-4 mb-4 p-5 animate-slide-up max-h-[85vh] overflow-y-auto"
+            className="w-full max-w-[430px] bg-[#14101f] border border-white/10 rounded-3xl mx-4 mb-4 p-5 animate-slide-up max-h-[85vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -268,9 +268,9 @@ export default function UnifiedHome({
               </h3>
               <button
                 onClick={() => setShowCreate(false)}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
               >
-                <X className="w-4 h-4 text-text-2" />
+                <X className="w-4 h-4 text-white/60" />
               </button>
             </div>
 
@@ -323,26 +323,26 @@ export default function UnifiedHome({
               <button
                 type="button"
                 onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
-                className="w-full rounded-xl py-6 flex items-center justify-center gap-2 bg-white/5 border border-border mb-3"
+                className="w-full rounded-xl py-3 flex items-center justify-center gap-2 bg-white/8 border border-white/10 hover:bg-white/12 transition-colors mb-3"
               >
                 <span
-                  className={`w-5 h-5 rounded-full bg-gradient-to-br ${IMAGE_COLORS[colorIdx]}`}
+                  className={`w-5 h-5 rounded-full bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} ring-1 ring-white/20`}
                 />
-                <span className="text-sm text-text-2">Changer la couleur</span>
+                <span className="text-sm text-white/60">Changer la couleur</span>
               </button>
             )}
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="text-xs text-text-3 font-semibold mb-1 block">Prix de départ</label>
+                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Prix de départ</label>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setStartPrice((p) => Math.max(5, p - 5))} className="w-8 h-8 rounded-lg border border-border text-text-2 font-bold text-sm">−</button>
-                  <span className="font-extrabold text-lg w-12 text-center">{startPrice} €</span>
-                  <button onClick={() => setStartPrice((p) => p + 5)} className="w-8 h-8 rounded-lg border border-border text-text-2 font-bold text-sm">+</button>
+                  <button onClick={() => setStartPrice((p) => Math.max(5, p - 5))} className="w-8 h-8 rounded-lg border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors">−</button>
+                  <span className="font-extrabold text-lg w-12 text-center text-white">{startPrice} €</span>
+                  <button onClick={() => setStartPrice((p) => p + 5)} className="w-8 h-8 rounded-lg border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors">+</button>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-text-3 font-semibold mb-1 block">Achat immédiat</label>
+                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Achat immédiat</label>
                 <input
                   type="number"
                   placeholder="Optionnel"
@@ -354,7 +354,7 @@ export default function UnifiedHome({
             </div>
 
             <div className="mb-4">
-              <p className="text-xs text-text-3 font-semibold mb-2">Durée</p>
+              <p className="text-xs text-white/50 font-semibold mb-2">Durée</p>
               <div className="flex gap-2">
                 {(['3j', '5j', '7j'] as const).map((d) => (
                   <button key={d} onClick={() => setDuration(d)} className={`duration-pill ${duration === d ? 'active' : ''}`}>{d}</button>
