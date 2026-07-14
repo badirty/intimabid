@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CreditCard, Sparkles } from 'lucide-react';
 import { centsToEuros, eurosToCents } from '@/lib/format';
 import { demoTopup, fetchWallet, isDbReady } from '@/lib/db';
@@ -53,6 +53,7 @@ export default function WalletScreen({
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [dbReady, setDbReady] = useState(true);
   const [busy, setBusy] = useState(false);
+  const paymentHandled = useRef(false);
 
   const stripeEnabled = !!config?.stripe;
   const demoEnabled = !!config?.demoWallet;
@@ -84,19 +85,68 @@ export default function WalletScreen({
   }, []);
 
   useEffect(() => {
+    if (paymentHandled.current) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('wallet') === 'success') {
-      setMsg('Paiement reçu ! Ton solde se met à jour…');
-      window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(() => {
-        load().then(() => onBalanceChange?.());
-      }, 2000);
-    }
-    if (params.get('wallet') === 'cancel') {
+    const walletStatus = params.get('wallet');
+    if (!walletStatus) return;
+
+    paymentHandled.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (walletStatus === 'cancel') {
       setError('Paiement annulé');
-      window.history.replaceState({}, '', window.location.pathname);
+      return;
     }
-  }, [load, onBalanceChange]);
+
+    if (walletStatus !== 'success') return;
+
+    const sessionId = params.get('session_id');
+    setMsg('Paiement reçu ! Mise à jour du solde…');
+
+    (async () => {
+      const before = (await fetchWallet(userId))?.balance_cents ?? 0;
+
+      if (sessionId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const res = await fetch('/api/stripe/confirm', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setMsg(data.credited
+              ? `+${centsToEuros(data.amount_cents)} € ajoutés ✨`
+              : 'Solde déjà à jour ✨');
+            await load();
+            onBalanceChange?.();
+            return;
+          }
+          if (data.error) setError(data.error);
+        } catch {
+          /* retry polling */
+        }
+      }
+
+      for (let i = 0; i < 8; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const w = await load();
+        if ((w?.balance_cents ?? 0) > before) {
+          setMsg('Solde mis à jour ✨');
+          onBalanceChange?.();
+          return;
+        }
+      }
+      if (!sessionId) {
+        setError('Paiement reçu mais solde pas encore crédité. Recharge la page dans 1 min.');
+      }
+    })();
+  }, [userId, load, onBalanceChange]);
 
   const recharge = async (mode: 'demo' | 'stripe') => {
     const cents = eurosToCents(topupEuros);

@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         },
         quantity: 1,
       }],
-      success_url: `${siteUrl}/?wallet=success`,
+      success_url: `${siteUrl}/?wallet=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/?wallet=cancel`,
       metadata: {
         type: 'wallet_topup',

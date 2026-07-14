@@ -1,12 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import {
-  stripeSecretKey,
-  stripeWebhookSecret,
-  supabaseAnonKey,
-  supabaseServiceRoleKey,
-  supabaseUrl,
-} from '@/lib/env';
+import { creditStripeTopup } from '@/lib/stripe-credit';
+import { stripeSecretKey, stripeWebhookSecret } from '@/lib/env';
 
 export async function POST(request: Request) {
   const secret = stripeSecretKey;
@@ -30,28 +24,18 @@ export async function POST(request: Request) {
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as { metadata?: Record<string, string> };
+    const session = event.data.object as { id: string; metadata?: Record<string, string> };
     const userId = session.metadata?.user_id;
     const amountCents = parseInt(session.metadata?.amount_cents ?? '0', 10);
 
     if (userId && amountCents > 0) {
-      const client = supabaseServiceRoleKey
-        ? createClient(supabaseUrl, supabaseServiceRoleKey)
-        : createClient(supabaseUrl, supabaseAnonKey);
-
-      const { data: wallet } = await client.from('wallets').select('*').eq('user_id', userId).maybeSingle();
-      const newBalance = (wallet?.balance_cents ?? 0) + amountCents;
-      await client.from('wallets').upsert({
-        user_id: userId,
-        balance_cents: newBalance,
-        pending_cents: wallet?.pending_cents ?? 0,
-      });
-      await client.from('wallet_transactions').insert({
-        user_id: userId,
-        type: 'topup_stripe',
-        amount_cents: amountCents,
-        description: 'Recharge Stripe',
-      });
+      try {
+        await creditStripeTopup(userId, amountCents, session.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Erreur crédit wallet';
+        console.error('[stripe webhook] credit failed:', message);
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
     }
   }
 
