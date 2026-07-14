@@ -16,6 +16,7 @@ export interface Auction {
   ends_at: string;
   image_color: string;
   image_url: string | null;
+  buy_now_price_cents: number | null;
   winner_id: string | null;
   created_at: string;
   seller_name?: string;

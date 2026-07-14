@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { hasCompletedOnboarding, getPreferredMode } from '@/lib/auth';
-import type { PreferredMode } from '@/lib/types';
+import { hasCompletedOnboarding } from '@/lib/auth';
 import AuthPage from '@/components/auth/AuthPage';
 import LandingPage from '@/components/landing/LandingPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
@@ -17,7 +16,6 @@ type UnauthView = 'landing' | 'login' | 'signup';
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [onboarded, setOnboarded] = useState(false);
-  const [preferredMode, setPreferredMode] = useState<PreferredMode>('both');
   const [loading, setLoading] = useState(true);
   const [unauthView, setUnauthView] = useState<UnauthView>('landing');
 
@@ -25,7 +23,6 @@ export default function Home() {
     setUser(sessionUser);
     if (sessionUser) {
       setOnboarded(hasCompletedOnboarding(sessionUser));
-      setPreferredMode(getPreferredMode(sessionUser));
       ensureUserBootstrap(sessionUser.id, sessionUser.email).catch(() => {});
     } else {
       setOnboarded(false);
@@ -71,12 +68,11 @@ export default function Home() {
     setOnboarded(false);
   };
 
-  const handleOnboardingComplete = async (mode: PreferredMode) => {
+  const handleOnboardingComplete = async (_mode?: string) => {
     const { data: { user: updatedUser } } = await supabase.auth.getUser();
     if (updatedUser) {
       setUser(updatedUser);
       setOnboarded(true);
-      setPreferredMode(mode);
     }
   };
 
@@ -115,9 +111,7 @@ export default function Home() {
   return (
     <AppShell
       user={user}
-      preferredMode={preferredMode}
       onSignOut={handleSignOut}
-      onPreferredModeChange={setPreferredMode}
     />
   );
 }

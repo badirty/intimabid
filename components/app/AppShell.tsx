@@ -2,29 +2,24 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import type { Tab, PreferredMode, AppMode } from '@/lib/types';
-import { getInitialAppMode } from '@/lib/auth';
+import type { Tab } from '@/lib/types';
 import { getUnreadNotificationCount } from '@/lib/db';
-import ModeSwitcher from '@/components/layout/ModeSwitcher';
+import GhostLogo from '@/components/brand/GhostLogo';
 import BottomNav from '@/components/layout/BottomNav';
-import BuyerHome from '@/components/buyer/BuyerHome';
-import SellerDashboard from '@/components/seller/SellerDashboard';
+import UnifiedHome from '@/components/app/UnifiedHome';
 import ProfileScreen from '@/components/shared/ProfileScreen';
 import WalletScreen from '@/components/wallet/WalletScreen';
 import NotificationsScreen from '@/components/notifications/NotificationsScreen';
 
 export default function AppShell({
   user,
-  preferredMode,
   onSignOut,
-  onPreferredModeChange,
 }: {
   user: User;
-  preferredMode: PreferredMode;
+  preferredMode?: string;
   onSignOut: () => void;
-  onPreferredModeChange?: (m: PreferredMode) => void;
+  onPreferredModeChange?: (m: string) => void;
 }) {
-  const [appMode, setAppMode] = useState<AppMode>(getInitialAppMode(preferredMode));
   const [tab, setTab] = useState<Tab>('home');
   const [notifCount, setNotifCount] = useState(0);
   const [walletVersion, setWalletVersion] = useState(0);
@@ -62,11 +57,11 @@ export default function AppShell({
         <ProfileScreen
           userId={user.id}
           email={user.email}
-          appMode={appMode}
-          preferredMode={preferredMode}
+          appMode="buyer"
+          preferredMode="both"
           onSignOut={onSignOut}
-          onModeChange={(m) => { setAppMode(m); setTab('home'); }}
-          onPreferredModeChange={onPreferredModeChange}
+          onModeChange={() => setTab('home')}
+          onPreferredModeChange={() => {}}
           onWallet={goWallet}
           walletVersion={walletVersion}
         />
@@ -75,32 +70,38 @@ export default function AppShell({
     if (tab === 'notifications') {
       return <NotificationsScreen userId={user.id} />;
     }
-    if (appMode === 'buyer') {
-      return (
-        <BuyerHome
-          userId={user.id}
-          initialTab={tab === 'favorites' ? 'favorites' : 'live'}
-          onWalletNeeded={goWallet}
-        />
-      );
-    }
-    return <SellerDashboard userId={user.id} onWallet={goWallet} />;
+    return <UnifiedHome userId={user.id} onWalletNeeded={goWallet} />;
   };
 
   return (
     <div className="app-shell">
+      {/* Header */}
       <div
-        className="header-dark px-4 py-2 flex justify-center border-b border-white/5 shrink-0"
+        className="header-dark px-4 py-2.5 flex items-center justify-between shrink-0 z-20 relative"
         style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
       >
-        <ModeSwitcher mode={appMode} onChange={(m) => { setAppMode(m); setTab('home'); }} />
+        <div className="flex items-center gap-2.5">
+          <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
+            <GhostLogo size={22} />
+          </div>
+          <span
+            className="text-sm font-extrabold tracking-wider text-white/90"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            badirty
+          </span>
+        </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto pb-20">
+      <main className="flex-1 overflow-y-auto pb-24 relative z-10">
         {content()}
       </main>
 
-      <BottomNav active={tab} onChange={(t) => { setTab(t); if (t === 'notifications') refreshNotifs(); }} notifCount={notifCount} />
+      <BottomNav
+        active={tab}
+        onChange={(t) => { setTab(t); if (t === 'notifications') refreshNotifs(); }}
+        notifCount={notifCount}
+      />
     </div>
   );
 }

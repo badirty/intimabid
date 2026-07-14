@@ -115,6 +115,7 @@ function mapAuctionRow(row: Record<string, unknown>, sellerName?: string): Aucti
     ends_at: row.ends_at as string,
     image_color: row.image_color as string,
     image_url: (row.image_url as string) ?? null,
+    buy_now_price_cents: (row.buy_now_price_cents as number) ?? null,
     winner_id: (row.winner_id as string) ?? null,
     created_at: row.created_at as string,
     seller_name: sellerName ?? 'Vendeur',
@@ -145,6 +146,7 @@ export async function createAuction(
   durationDays: number,
   imageColor: string,
   imageUrl?: string | null,
+  buyNowPriceCents?: number | null,
 ) {
   const endsAt = durationDaysToEndsAt(durationDays);
   const { data, error } = await supabase
@@ -157,6 +159,7 @@ export async function createAuction(
       ends_at: endsAt,
       image_color: imageColor,
       image_url: imageUrl ?? null,
+      buy_now_price_cents: buyNowPriceCents ?? null,
       status: 'live',
     })
     .select()
