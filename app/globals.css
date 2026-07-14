@@ -232,11 +232,11 @@ body {
 /* Ghost Logo Wrap */
 
 
-/* Floating Action Button */
+/* Floating Action Button — aligné dans la colonne app (430px) */
 .fab {
   position: fixed;
   bottom: calc(80px + env(safe-area-inset-bottom));
-  right: 16px;
+  right: max(1rem, calc(50vw - 215px + 1rem));
   z-index: 40;
   width: 56px;
   height: 56px;
@@ -251,6 +251,80 @@ body {
 }
 .fab:hover { transform: scale(1.06); box-shadow: 0 6px 32px var(--accent-glow); }
 .fab:active { transform: scale(0.94); }
+
+/* Modal création enchère */
+.create-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: rgba(2, 1, 5, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.create-modal-panel {
+  width: 100%;
+  max-width: 400px;
+  max-height: min(90dvh, 720px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #1a1428 0%, #120e1c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 1.25rem;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 40px var(--accent-glow);
+  -webkit-overflow-scrolling: touch;
+}
+
+.create-photo-zone {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.create-photo-zone:hover {
+  border-color: var(--border-glow);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.textarea-bar {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: var(--text);
+  resize: vertical;
+  min-height: 88px;
+  transition: border-color 0.2s;
+}
+.textarea-bar:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+}
+.textarea-bar::placeholder { color: rgba(255, 255, 255, 0.3); }
+
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 0.5rem;
+}
 
 /* Tab bar */
 .tab-bar {

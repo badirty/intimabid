@@ -147,6 +147,7 @@ export async function createAuction(
   imageColor: string,
   imageUrl?: string | null,
   buyNowPriceCents?: number | null,
+  description?: string | null,
 ) {
   const endsAt = durationDaysToEndsAt(durationDays);
   const { data, error } = await supabase
@@ -154,6 +155,7 @@ export async function createAuction(
     .insert({
       seller_id: sellerId,
       title,
+      description: description?.trim() || null,
       start_price_cents: startPriceCents,
       current_price_cents: startPriceCents,
       ends_at: endsAt,

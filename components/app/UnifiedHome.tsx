@@ -37,6 +37,7 @@ export default function UnifiedHome({
 
   // Create form state
   const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
   const [startPrice, setStartPrice] = useState(25);
   const [duration, setDuration] = useState<'3j' | '5j' | '7j'>('5j');
   const [colorIdx, setColorIdx] = useState(0);
@@ -52,6 +53,13 @@ export default function UnifiedHome({
       if (imagePreview) URL.revokeObjectURL(imagePreview);
     };
   }, [imagePreview]);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [showCreate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,8 +130,10 @@ export default function UnifiedHome({
         IMAGE_COLORS[colorIdx],
         imageUrl,
         buyNowCents,
+        createDescription.trim() || null,
       );
       setCreateTitle('');
+      setCreateDescription('');
       setStartPrice(25);
       setBuyNowPrice('');
       setImageFile(null);
@@ -244,131 +254,194 @@ export default function UnifiedHome({
       </div>
 
       {/* Floating Action Button */}
-      <button
-        onClick={() => setShowCreate(true)}
-        className="fab"
-        aria-label="Créer une enchère"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {!showCreate && (
+        <button
+          type="button"
+          onClick={() => { setCreateError(null); setShowCreate(true); }}
+          className="fab"
+          aria-label="Créer une enchère"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
-      {/* Create Auction Modal */}
+      {/* Create Auction Modal — centré */}
       {showCreate && (
         <div
-          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end justify-center"
+          className="create-modal-overlay"
           onClick={() => setShowCreate(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-auction-title"
         >
           <div
-            className="w-full max-w-[430px] bg-[#14101f] border border-white/10 rounded-3xl mx-4 mb-4 p-5 animate-slide-up max-h-[85vh] overflow-y-auto shadow-2xl"
+            className="create-modal-panel animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-extrabold text-lg" style={{ fontFamily: 'var(--font-display)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <h3
+                id="create-auction-title"
+                className="font-extrabold text-lg text-white"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
                 Nouvelle enchère
               </h3>
               <button
+                type="button"
                 onClick={() => setShowCreate(false)}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors"
               >
-                <X className="w-4 h-4 text-white/60" />
+                <X className="w-4 h-4 text-white/70" />
               </button>
             </div>
 
-            <input
-              placeholder="Titre de l'article..."
-              value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)}
-              className="search-bar w-full px-4 py-3 text-sm mb-3"
-            />
-
-            {/* Image upload */}
-            <div className="mb-3">
-              {imagePreview ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  <img src={imagePreview} alt="Aperçu" className="w-full h-44 object-cover" />
+            <div className="space-y-4">
+              {/* Photo */}
+              <div>
+                <label className="form-label">Photo</label>
+                {imagePreview ? (
+                  <div className="relative rounded-2xl overflow-hidden aspect-[4/3]">
+                    <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(null); }}
+                      className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/70 flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => { setImageFile(null); setImagePreview(null); }}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`create-photo-zone bg-gradient-to-br ${IMAGE_COLORS[colorIdx]}`}
                   >
-                    <X className="w-4 h-4 text-white" />
+                    <Camera className="w-10 h-10 text-white/90" />
+                    <span className="text-sm font-semibold text-white/90">Ajouter une photo</span>
+                    <span className="text-xs text-white/60">JPG, PNG ou WebP · max 5 Mo</span>
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-full rounded-xl py-10 flex flex-col items-center gap-2 bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} relative overflow-hidden`}
-                >
-                  <Camera className="w-8 h-8 text-white/80" />
-                  <span className="text-sm font-semibold text-white/80">Ajouter une photo</span>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) { setCreateError('Image trop grande (max 5 Mo)'); return; }
-                  setImageFile(file);
-                  setImagePreview(URL.createObjectURL(file));
-                }}
-              />
-            </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      setCreateError('Image trop grande (max 5 Mo)');
+                      return;
+                    }
+                    setImageFile(file);
+                    setImagePreview(URL.createObjectURL(file));
+                    setCreateError(null);
+                  }}
+                />
+                {!imagePreview && (
+                  <button
+                    type="button"
+                    onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
+                    className="mt-2 w-full rounded-xl py-2.5 flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/8 transition-colors"
+                  >
+                    <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} ring-1 ring-white/20`} />
+                    <span className="text-xs text-white/60">Couleur de fond si pas de photo</span>
+                  </button>
+                )}
+              </div>
 
-            {!imagePreview && (
+              {/* Titre */}
+              <div>
+                <label className="form-label" htmlFor="auction-title">Titre</label>
+                <input
+                  id="auction-title"
+                  placeholder="Ex : Ensemble lingerie noire"
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  className="search-bar w-full px-4 py-3 text-sm outline-none"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="form-label" htmlFor="auction-desc">Description</label>
+                <textarea
+                  id="auction-desc"
+                  placeholder="Décris ton article : état, taille, détails..."
+                  value={createDescription}
+                  onChange={(e) => setCreateDescription(e.target.value)}
+                  className="textarea-bar w-full px-4 py-3 text-sm"
+                  rows={3}
+                />
+              </div>
+
+              {/* Prix */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Prix de départ</label>
+                  <div className="flex items-center justify-center gap-2 bg-white/5 rounded-xl py-2 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setStartPrice((p) => Math.max(5, p - 5))}
+                      className="w-9 h-9 rounded-lg border border-white/15 text-white/70 font-bold hover:bg-white/5"
+                    >
+                      −
+                    </button>
+                    <span className="font-extrabold text-lg text-white min-w-[3rem] text-center">{startPrice} €</span>
+                    <button
+                      type="button"
+                      onClick={() => setStartPrice((p) => p + 5)}
+                      className="w-9 h-9 rounded-lg border border-white/15 text-white/70 font-bold hover:bg-white/5"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label" htmlFor="buy-now">Achat immédiat</label>
+                  <input
+                    id="buy-now"
+                    type="number"
+                    placeholder="Optionnel"
+                    value={buyNowPrice}
+                    onChange={(e) => setBuyNowPrice(e.target.value)}
+                    className="search-bar w-full px-3 py-3 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Durée */}
+              <div>
+                <label className="form-label">Durée</label>
+                <div className="flex gap-2">
+                  {(['3j', '5j', '7j'] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDuration(d)}
+                      className={`duration-pill flex-1 text-center ${duration === d ? 'active' : ''}`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {createError && (
+                <p className="text-rose text-sm bg-rose/10 border border-rose/20 rounded-xl px-4 py-2.5">
+                  {createError}
+                </p>
+              )}
+
               <button
                 type="button"
-                onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
-                className="w-full rounded-xl py-3 flex items-center justify-center gap-2 bg-white/8 border border-white/10 hover:bg-white/12 transition-colors mb-3"
+                onClick={handleCreate}
+                disabled={creating}
+                className="btn-accent w-full py-4 text-sm disabled:opacity-60"
               >
-                <span
-                  className={`w-5 h-5 rounded-full bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} ring-1 ring-white/20`}
-                />
-                <span className="text-sm text-white/60">Changer la couleur</span>
+                {creating ? 'Lancement...' : "Lancer l'enchère"}
               </button>
-            )}
-
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Prix de départ</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setStartPrice((p) => Math.max(5, p - 5))} className="w-8 h-8 rounded-lg border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors">−</button>
-                  <span className="font-extrabold text-lg w-12 text-center text-white">{startPrice} €</span>
-                  <button onClick={() => setStartPrice((p) => p + 5)} className="w-8 h-8 rounded-lg border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors">+</button>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Achat immédiat</label>
-                <input
-                  type="number"
-                  placeholder="Optionnel"
-                  value={buyNowPrice}
-                  onChange={(e) => setBuyNowPrice(e.target.value)}
-                  className="search-bar w-full px-3 py-2.5 text-sm"
-                />
-              </div>
             </div>
-
-            <div className="mb-4">
-              <p className="text-xs text-white/50 font-semibold mb-2">Durée</p>
-              <div className="flex gap-2">
-                {(['3j', '5j', '7j'] as const).map((d) => (
-                  <button key={d} onClick={() => setDuration(d)} className={`duration-pill ${duration === d ? 'active' : ''}`}>{d}</button>
-                ))}
-              </div>
-            </div>
-
-            {createError && (
-              <p className="text-rose text-sm bg-rose/10 rounded-xl px-4 py-2 mb-3">{createError}</p>
-            )}
-
-            <button onClick={handleCreate} disabled={creating} className="btn-accent w-full py-4 text-sm">
-              {creating ? 'Lancement...' : 'Lancer l\'enchère'}
-            </button>
           </div>
         </div>
       )}
