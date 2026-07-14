@@ -289,14 +289,14 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1rem;
+  padding: 1rem 1rem calc(1rem + 10mm);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
 .create-modal-footer {
   flex-shrink: 0;
-  padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  padding: 0.85rem 1rem max(calc(0.85rem + 10mm), calc(env(safe-area-inset-bottom) + 10mm));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(13, 11, 24, 0.98);
 }
