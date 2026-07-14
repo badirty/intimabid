@@ -37,8 +37,11 @@ export async function POST(request: Request) {
     }
 
     const { amount_cents } = await request.json();
-    if (!amount_cents || amount_cents < 100) {
-      return NextResponse.json({ error: 'Montant invalide (min 1€)' }, { status: 400 });
+    if (!amount_cents || amount_cents < 50) {
+      return NextResponse.json({ error: 'Montant invalide (min 0,50 €)' }, { status: 400 });
+    }
+    if (amount_cents > 50000) {
+      return NextResponse.json({ error: 'Montant invalide (max 500 €)' }, { status: 400 });
     }
 
     const Stripe = (await import('stripe')).default;

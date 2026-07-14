@@ -26,6 +26,14 @@ async function fetchAppConfig(): Promise<AppConfig> {
   return { stripe: false, demoWallet: false };
 }
 
+const MIN_TOPUP_EUR = 0.5;
+const MAX_TOPUP_EUR = 500;
+const TOPUP_SHORTCUTS = ['20', '50', '100'] as const;
+
+function formatTopupEuros(euros: number): string {
+  return euros % 1 === 0 ? euros.toFixed(0) : euros.toFixed(2);
+}
+
 export default function WalletScreen({
   userId,
   onBack,
@@ -39,7 +47,7 @@ export default function WalletScreen({
   const [pendingCents, setPendingCents] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [topupAmount, setTopupAmount] = useState('50');
+  const [topupEuros, setTopupEuros] = useState(50);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -91,9 +99,13 @@ export default function WalletScreen({
   }, [load, onBalanceChange]);
 
   const recharge = async (mode: 'demo' | 'stripe') => {
-    const cents = eurosToCents(parseFloat(topupAmount));
-    if (Number.isNaN(cents) || cents < 100) {
-      setError('Minimum 1 €');
+    const cents = eurosToCents(topupEuros);
+    if (Number.isNaN(cents) || cents < 50) {
+      setError('Minimum 0,50 €');
+      return;
+    }
+    if (cents > 50000) {
+      setError('Maximum 500 €');
       return;
     }
     setBusy(true);
@@ -215,30 +227,48 @@ export default function WalletScreen({
         {canRecharge && (
           <>
             <div className="flex gap-2 mb-4">
-              {['20', '50', '100'].map((v) => (
+              {TOPUP_SHORTCUTS.map((v) => (
                 <button
                   key={v}
                   type="button"
-                  onClick={() => setTopupAmount(v)}
+                  onClick={() => setTopupEuros(parseFloat(v))}
                   disabled={busy}
                   className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
-                    topupAmount === v ? 'border-buyer bg-buyer/15 text-buyer' : 'border-border text-text-2'
+                    topupEuros === parseFloat(v) ? 'border-buyer bg-buyer/15 text-buyer' : 'border-border text-text-2'
                   }`}
                 >
                   {v} €
                 </button>
               ))}
             </div>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={topupAmount}
-              onChange={(e) => setTopupAmount(e.target.value)}
-              disabled={busy}
-              className="search-bar w-full px-4 py-3 text-sm mb-4 outline-none"
-              placeholder="Montant en €"
-            />
+
+            <div className="mb-4">
+              <div className="flex items-baseline justify-between mb-2">
+                <p className="text-text-3 text-xs font-semibold">Montant</p>
+                <p
+                  className="text-2xl font-extrabold text-text tabular-nums"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {formatTopupEuros(topupEuros)} €
+                </p>
+              </div>
+              <input
+                type="range"
+                min={MIN_TOPUP_EUR}
+                max={MAX_TOPUP_EUR}
+                step="0.5"
+                value={topupEuros}
+                onChange={(e) => setTopupEuros(parseFloat(e.target.value))}
+                disabled={busy}
+                className="w-full h-2 rounded-full appearance-none bg-white/10 accent-accent cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-text-3 mt-1">
+                <span>0,50 €</span>
+                <span>100 €</span>
+                <span>250 €</span>
+                <span>500 €</span>
+              </div>
+            </div>
           </>
         )}
 
