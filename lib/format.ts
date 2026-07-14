@@ -39,3 +39,9 @@ export function durationDaysToEndsAt(days: number): string {
   d.setDate(d.getDate() + days);
   return d.toISOString();
 }
+
+export function durationHoursToEndsAt(hours: number): string {
+  const d = new Date();
+  d.setHours(d.getHours() + hours);
+  return d.toISOString();
+}

@@ -61,9 +61,8 @@ export default function SellerDashboard({
         userId,
         title.trim(),
         eurosToCents(startPrice),
-        DURATIONS[duration],
-        IMAGE_COLORS[colorIdx],
-        imageUrl,
+        DURATIONS[duration] * 24,
+        imageUrl ?? IMAGE_COLORS[colorIdx],
       );
       setTitle('');
       setImageFile(null);

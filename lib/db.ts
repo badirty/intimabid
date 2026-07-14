@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
 import type { Auction, Notification, UserStats, Wallet } from '@/lib/types';
-import { durationDaysToEndsAt, eurosToCents } from '@/lib/format';
+import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
 export async function ensureUserBootstrap(userId: string, email?: string) {
   const name = email?.split('@')[0] ?? 'user';
@@ -143,24 +143,21 @@ export async function createAuction(
   sellerId: string,
   title: string,
   startPriceCents: number,
-  durationDays: number,
-  imageColor: string,
-  imageUrl?: string | null,
+  durationHours: number,
+  imageUrl: string,
   buyNowPriceCents?: number | null,
-  description?: string | null,
 ) {
-  const endsAt = durationDaysToEndsAt(durationDays);
+  const endsAt = durationHoursToEndsAt(durationHours);
   const { data, error } = await supabase
     .from('auctions')
     .insert({
       seller_id: sellerId,
       title,
-      description: description?.trim() || null,
       start_price_cents: startPriceCents,
       current_price_cents: startPriceCents,
       ends_at: endsAt,
-      image_color: imageColor,
-      image_url: imageUrl ?? null,
+      image_color: 'from-violet-300 via-purple-200 to-fuchsia-200',
+      image_url: imageUrl,
       buy_now_price_cents: buyNowPriceCents ?? null,
       status: 'live',
     })
