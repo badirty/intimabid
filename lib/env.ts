@@ -21,7 +21,8 @@ export const supabaseUrl =
   readEnv('NEXT_PUBLIC_SUPABASE_URL') ?? 'https://cmtijlciwosbpzokndnp.supabase.co';
 
 export const supabaseAnonKey =
-  readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SU_BASE_ANON_KEY') ?? '';
+  readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SU_BASE_ANON_KEY')
+  ?? 'sb_publishable_uwJf933WxGLlYhT3h7I8pw_-eEUoDRq';
 
 /** Vérifie que la clé anon est bien configurée (appelé côté client après hydratation). */
 export function ensureAnonKey(): string {
