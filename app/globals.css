@@ -230,7 +230,59 @@ body {
 }
 
 /* Ghost Logo Wrap */
+.ghost-logo-wrap {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(236, 72, 153, 0.12) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 0 24px var(--ghost-glow);
+}
 
+/* Detail / overlay action bar */
+.detail-action-bar {
+  background: rgba(13, 11, 24, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+}
+
+.bid-history-row {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+.bid-history-row-top {
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.alert-error {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.alert-success {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.teaser-card {
+  scroll-snap-align: start;
+  flex: 0 0 72%;
+  max-width: 280px;
+}
+
+.teaser-scroll {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.teaser-scroll::-webkit-scrollbar { display: none; }
 
 /* Floating Action Button — aligné dans la colonne app (430px) */
 .fab {
@@ -381,8 +433,8 @@ body {
 }
 .tab-bar button {
   flex: 1;
-  padding: 12px 0;
-  font-size: 13px;
+  padding: 10px 0;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-3);
   transition: all 0.2s;

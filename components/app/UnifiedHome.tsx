@@ -1,20 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Flame, Heart, Plus, Camera, X, Clock, User, Store } from 'lucide-react';
+import { Search, Flame, Heart, Plus, Camera, X, Clock, User, Store, Zap, TrendingUp } from 'lucide-react';
 import GhostLogo from '@/components/brand/GhostLogo';
 import type { Auction, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, eurosToCents, isAuctionLive } from '@/lib/format';
 import {
-  fetchEndedAuctions, fetchFavorites, fetchLiveAuctions, fetchSellerAuctions,
-  placeBid, toggleFavorite, createAuction, uploadAuctionImage, searchSellers,
+  fetchAuctionById, fetchEndedAuctions, fetchFavorites, fetchLiveAuctions,
+  fetchSellerAuctions, fetchTopSellers, buyNow, placeBid, toggleFavorite,
+  createAuction, uploadAuctionImage, searchSellers,
 } from '@/lib/db';
 import { useCountdown } from '@/hooks/useCountdown';
 import BidModal from '@/components/buyer/BidModal';
 import AuctionDetail from '@/components/buyer/AuctionDetail';
 import SellerShop from '@/components/buyer/SellerShop';
 
-type HomeTab = 'live' | 'selling' | 'ended';
+type HomeTab = 'live' | 'favorites' | 'selling' | 'ended';
+
+function hoursUntilEnd(endsAt: string) {
+  return (new Date(endsAt).getTime() - Date.now()) / 3_600_000;
+}
 type SearchMode = 'items' | 'sellers';
 const DURATION_PRESETS = [
   { label: '12h', hours: 12 },
@@ -25,14 +30,21 @@ const DURATION_PRESETS = [
 export default function UnifiedHome({
   userId,
   onWalletNeeded,
+  onOverlayChange,
+  initialAuctionId,
+  onAuctionOpened,
 }: {
   userId: string;
   onWalletNeeded?: () => void;
+  onOverlayChange?: (open: boolean) => void;
+  initialAuctionId?: string | null;
+  onAuctionOpened?: () => void;
 }) {
   const [tab, setTab] = useState<HomeTab>('live');
   const [searchMode, setSearchMode] = useState<SearchMode>('items');
   const [search, setSearch] = useState('');
   const [sellerResults, setSellerResults] = useState<SellerSearchResult[]>([]);
+  const [topSellers, setTopSellers] = useState<SellerSearchResult[]>([]);
   const [sellerSearchLoading, setSellerSearchLoading] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<SellerSearchResult | null>(null);
   const [live, setLive] = useState<Auction[]>([]);
@@ -95,6 +107,21 @@ export default function UnifiedHome({
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    fetchTopSellers(6).then(setTopSellers).catch(() => setTopSellers([]));
+  }, []);
+
+  useEffect(() => {
+    if (!initialAuctionId) return;
+    fetchAuctionById(initialAuctionId)
+      .then((a) => { if (a) setDetailAuction(a); })
+      .finally(() => onAuctionOpened?.());
+  }, [initialAuctionId, onAuctionOpened]);
+
+  useEffect(() => {
+    onOverlayChange?.(!!detailAuction || !!selectedSeller || showCreate);
+  }, [detailAuction, selectedSeller, showCreate, onOverlayChange]);
+
+  useEffect(() => {
     if (searchMode !== 'sellers') {
       setSellerResults([]);
       return;
@@ -121,13 +148,33 @@ export default function UnifiedHome({
     return () => clearTimeout(t);
   }, [toast]);
 
-  const items = tab === 'live'
-    ? [...live, ...favorites.filter((f) => !live.find((l) => l.id === f.id))]
-    : tab === 'selling' ? mySales : ended;
+  const filterBySearch = (list: Auction[]) => {
+    const q = search.trim().toLowerCase();
+    if (!q || searchMode !== 'items') return list;
+    return list.filter((a) => a.title.toLowerCase().includes(q));
+  };
+
+  const liveItems = filterBySearch(live);
+  const endingSoon = liveItems.filter((a) => hoursUntilEnd(a.ends_at) <= 2);
+  const otherLive = liveItems.filter((a) => hoursUntilEnd(a.ends_at) > 2);
+  const favoriteItems = filterBySearch(favorites);
+  const endedItems = filterBySearch(ended);
 
   const handleBid = async (auction: Auction, amountCents: number) => {
     try { await placeBid(auction.id, amountCents); setToast('Offre placée !'); await load(); }
     catch (e) { const msg = e instanceof Error ? e.message : 'Erreur'; if (msg.includes('Solde')) onWalletNeeded?.(); throw e; }
+  };
+
+  const handleBuyNow = async (auction: Auction) => {
+    try {
+      await buyNow(auction.id);
+      setToast('Achat immédiat confirmé !');
+      await load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erreur';
+      if (msg.includes('Solde')) onWalletNeeded?.();
+      throw e;
+    }
   };
 
   const handleFavorite = async (auction: Auction) => {
@@ -178,7 +225,8 @@ export default function UnifiedHome({
     return (
       <AuctionDetail item={detailAuction} userId={userId}
         onClose={() => { setDetailAuction(null); load(); }}
-        onBid={handleBid} onFavorite={handleFavorite} onWalletNeeded={onWalletNeeded} />
+        onBid={handleBid} onBuyNow={handleBuyNow}
+        onFavorite={handleFavorite} onWalletNeeded={onWalletNeeded} />
     );
   }
 
@@ -201,13 +249,13 @@ export default function UnifiedHome({
       <div className="header-dark px-5 pt-2 pb-0">
         <div className="flex items-center justify-between py-2">
           <h2 className="text-xs uppercase tracking-widest text-white/40 font-bold">
-            {tab === 'live' ? 'Enchères en direct' : tab === 'selling' ? 'Mes ventes' : 'Terminées'}
+            {{live:'Enchères en direct',favorites:'Mes favoris',selling:'Mes ventes',ended:'Terminées'}[tab]}
           </h2>
         </div>
         <div className="tab-bar">
-          {(['live', 'selling', 'ended'] as const).map((t) => (
+          {(['live', 'favorites', 'selling', 'ended'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={tab === t ? 'active' : ''}>
-              {{live:'Live',selling:'Mes ventes',ended:'Terminées'}[t]}
+              {{live:'Live',favorites:'Favoris',selling:'Ventes',ended:'Finies'}[t]}
             </button>
           ))}
         </div>
@@ -250,7 +298,36 @@ export default function UnifiedHome({
 
         {toast && <div className="bg-accent/10 text-accent text-sm font-bold px-4 py-2.5 rounded-2xl text-center border border-accent/20">{toast}</div>}
 
-        {isSellerMode && !sellerQuery && (
+        {isSellerMode && !sellerQuery && topSellers.length > 0 && (
+          <div>
+            <p className="text-xs text-text-3 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-accent" /> Vendeurs actifs
+            </p>
+            <div className="space-y-2">
+              {topSellers.map((seller) => (
+                <button
+                  key={seller.id}
+                  type="button"
+                  onClick={() => setSelectedSeller(seller)}
+                  className="ui-card w-full p-4 flex items-center gap-3 text-left hover:border-accent/30 transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                    <User className="w-5 h-5 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-text truncate">@{seller.display_name}</p>
+                    <p className="text-text-3 text-xs mt-0.5">
+                      {seller.live_count} live · {seller.total_sales} vente{seller.total_sales !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <Store className="w-4 h-4 text-text-3 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isSellerMode && !sellerQuery && topSellers.length === 0 && (
           <div className="ui-card p-6 text-center">
             <Store className="w-8 h-8 text-accent mx-auto mb-2" />
             <p className="font-bold text-text text-sm">Trouver un vendeur</p>
@@ -302,22 +379,87 @@ export default function UnifiedHome({
           </div>
         )}
 
-        {!isSellerMode && !loading && items.length === 0 && (
+        {!isSellerMode && !loading && tab === 'live' && liveItems.length === 0 && (
           <div className="ui-card p-10 text-center">
-            <p className="text-4xl mb-3">{{live:'🕯️',selling:'📦',ended:'✨'}[tab]}</p>
-            <p className="font-bold text-text text-lg">{{live:'Aucune enchère live',selling:'Aucune vente en cours',ended:'Aucune vente terminée'}[tab]}</p>
-            <p className="text-text-3 text-sm mt-2">
-              {tab === 'live' ? 'Lance la première enchère avec le bouton +' : tab === 'selling' ? 'Crée une enchère pour commencer à vendre' : 'Les ventes terminées apparaîtront ici'}
-            </p>
+            <p className="text-4xl mb-3">🕯️</p>
+            <p className="font-bold text-text text-lg">Aucune enchère live</p>
+            <p className="text-text-3 text-sm mt-2">Lance la première enchère avec le bouton +</p>
           </div>
         )}
 
-        {!isSellerMode && !loading && items.map((item, i) => (
-          <AuctionCard key={item.id} item={item} featured={i === 0 && tab === 'live'}
+        {!isSellerMode && !loading && tab === 'favorites' && favoriteItems.length === 0 && (
+          <div className="ui-card p-10 text-center">
+            <p className="text-4xl mb-3">💜</p>
+            <p className="font-bold text-text text-lg">Aucun favori</p>
+            <p className="text-text-3 text-sm mt-2">Tape le cœur sur une enchère pour la retrouver ici</p>
+          </div>
+        )}
+
+        {!isSellerMode && !loading && tab === 'selling' && mySales.length === 0 && (
+          <div className="ui-card p-10 text-center">
+            <p className="text-4xl mb-3">📦</p>
+            <p className="font-bold text-text text-lg">Aucune vente en cours</p>
+            <p className="text-text-3 text-sm mt-2">Crée une enchère pour commencer à vendre</p>
+          </div>
+        )}
+
+        {!isSellerMode && !loading && tab === 'ended' && endedItems.length === 0 && (
+          <div className="ui-card p-10 text-center">
+            <p className="text-4xl mb-3">✨</p>
+            <p className="font-bold text-text text-lg">Aucune vente terminée</p>
+            <p className="text-text-3 text-sm mt-2">Les ventes terminées apparaîtront ici</p>
+          </div>
+        )}
+
+        {!isSellerMode && !loading && tab === 'live' && endingSoon.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs text-rose uppercase tracking-widest font-bold flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5" /> Se termine bientôt
+            </p>
+            {endingSoon.map((item) => (
+              <AuctionCard key={item.id} item={item} featured
+                onPress={() => setDetailAuction(item)}
+                onBid={(cents) => handleBid(item, cents)}
+                onBuyNow={() => handleBuyNow(item)}
+                onCustomBid={() => setBidModal(item)}
+                onFavorite={() => handleFavorite(item)} />
+            ))}
+          </div>
+        )}
+
+        {!isSellerMode && !loading && tab === 'live' && otherLive.map((item) => (
+          <AuctionCard key={item.id} item={item}
+            onPress={() => setDetailAuction(item)}
+            onBid={(cents) => handleBid(item, cents)}
+            onBuyNow={() => handleBuyNow(item)}
+            onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'favorites' && favoriteItems.map((item) => (
+          <AuctionCard key={item.id} item={item}
+            onPress={() => setDetailAuction(item)}
+            onBid={(cents) => handleBid(item, cents)}
+            onBuyNow={() => handleBuyNow(item)}
+            onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)}
+            showEnded={!isAuctionLive(item.status, item.ends_at)} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'selling' && mySales.map((item) => (
+          <AuctionCard key={item.id} item={item}
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onCustomBid={() => setBidModal(item)}
-            onFavorite={() => handleFavorite(item)} showEnded={tab === 'ended'} />
+            onFavorite={() => handleFavorite(item)} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'ended' && endedItems.map((item) => (
+          <AuctionCard key={item.id} item={item}
+            onPress={() => setDetailAuction(item)}
+            onBid={(cents) => handleBid(item, cents)}
+            onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)} showEnded />
         ))}
       </div>
 
@@ -537,7 +679,8 @@ export default function UnifiedHome({
         <BidModal title={bidModal.title}
           minCents={bidModal.current_price_cents + bidModal.bid_increment_cents}
           onClose={() => setBidModal(null)}
-          onSubmit={(cents) => handleBid(bidModal, cents)} />
+          onSubmit={(cents) => handleBid(bidModal, cents)}
+          onWalletNeeded={onWalletNeeded} />
       )}
     </div>
   );
@@ -552,15 +695,19 @@ function formatDuration(hours: number): string {
 }
 
 function AuctionCard({
-  item, featured, onPress, onBid, onCustomBid, onFavorite, showEnded,
+  item, featured, onPress, onBid, onBuyNow, onCustomBid, onFavorite, showEnded,
 }: {
   item: Auction; featured?: boolean; onPress?: () => void;
-  onBid: (cents: number) => Promise<void>; onCustomBid: () => void; onFavorite: () => void; showEnded?: boolean;
+  onBid: (cents: number) => Promise<void>;
+  onBuyNow?: () => Promise<void>;
+  onCustomBid: () => void; onFavorite: () => void; showEnded?: boolean;
 }) {
   const countdown = useCountdown(item.ends_at);
   const live = isAuctionLive(item.status, item.ends_at);
   const price = centsToEuros(item.current_price_cents);
   const [bidding, setBidding] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const buyNowPrice = item.buy_now_price_cents ? centsToEuros(item.buy_now_price_cents) : null;
 
   const quickBid = async () => {
     setBidding(true);
@@ -575,6 +722,11 @@ function AuctionCard({
         {item.image_url && <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
         {live && <span className="live-pill absolute top-3 right-3 flex items-center gap-1 animate-live-pulse"><Flame className="w-3 h-3" /> LIVE</span>}
+        {live && buyNowPrice && (
+          <span className="buy-now-badge absolute bottom-3 left-3 flex items-center gap-1">
+            <Zap className="w-3 h-3" /> {buyNowPrice} €
+          </span>
+        )}
         {showEnded && <span className="absolute top-3 right-3 bg-black/60 backdrop-blur text-white text-[11px] font-bold px-2.5 py-1 rounded-lg">{item.status === 'sold' ? 'VENDU' : 'TERMINÉ'}</span>}
         <button onClick={(e) => { e.stopPropagation(); onFavorite(); }}
           className="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center hover:bg-black/60 transition-colors">
@@ -598,8 +750,23 @@ function AuctionCard({
           </div>
         </div>
         {(item.bid_count ?? 0) > 0 && <p className="text-text-3 text-[11px] mt-2">{item.bid_count} offre{item.bid_count !== 1 ? 's' : ''}</p>}
+        {live && onBuyNow && buyNowPrice && (
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              setBuying(true);
+              try { await onBuyNow(); } catch { /* parent */ }
+              finally { setBuying(false); }
+            }}
+            disabled={buying}
+            className="btn-accent w-full py-2.5 text-xs mt-3 flex items-center justify-center gap-1"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            {buying ? '...' : `Acheter · ${buyNowPrice} €`}
+          </button>
+        )}
         {live && (
-          <div className="flex gap-2 mt-3">
+          <div className="flex gap-2 mt-2">
             <button onClick={(e) => { e.stopPropagation(); quickBid(); }} disabled={bidding} className="btn-accent flex-1 py-2.5 text-xs">
               {bidding ? '...' : `Enchérir · +${centsToEuros(item.bid_increment_cents)} €`}
             </button>

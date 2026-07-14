@@ -6,7 +6,13 @@ import { fetchNotifications, markAllNotificationsRead, markNotificationRead } fr
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-export default function NotificationsScreen({ userId }: { userId: string }) {
+export default function NotificationsScreen({
+  userId,
+  onOpenAuction,
+}: {
+  userId: string;
+  onOpenAuction?: (auctionId: string) => void;
+}) {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,8 +24,12 @@ export default function NotificationsScreen({ userId }: { userId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const markRead = async (n: Notification) => {
+  const handleTap = async (n: Notification) => {
     if (!n.read) await markNotificationRead(n.id);
+    if (n.auction_id && onOpenAuction) {
+      onOpenAuction(n.auction_id);
+      return;
+    }
     await load();
   };
 
@@ -51,8 +61,10 @@ export default function NotificationsScreen({ userId }: { userId: string }) {
         {items.map((n) => (
           <button
             key={n.id}
-            onClick={() => markRead(n)}
-            className={`ui-card w-full p-4 text-left transition-colors ${!n.read ? 'ring-2 ring-buyer/20' : ''}`}
+            onClick={() => handleTap(n)}
+            className={`ui-card w-full p-4 text-left transition-colors hover:border-accent/30 ${
+              !n.read ? 'ring-2 ring-buyer/20' : ''
+            }`}
           >
             <div className="flex justify-between gap-2">
               <p className="font-bold text-sm text-text">{n.title}</p>
@@ -61,6 +73,7 @@ export default function NotificationsScreen({ userId }: { userId: string }) {
             {n.body && <p className="text-text-2 text-xs mt-1">{n.body}</p>}
             <p className="text-text-3 text-[10px] mt-2">
               {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })}
+              {n.auction_id && ' · Voir l\'enchère →'}
             </p>
           </button>
         ))}

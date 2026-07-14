@@ -22,6 +22,7 @@ export default function AuthPage({
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,12 +48,14 @@ export default function AuthPage({
     if (!email || !password) { setError('E-mail et mot de passe requis.'); return; }
     setLoading('email');
     setError(null);
+    setSuccess(null);
     if (view === 'login') {
       const { error: e } = await supabase.auth.signInWithPassword({ email, password });
       if (e) setError(e.message); else onAuthSuccess?.();
     } else {
       const { error: e } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
-      if (e) setError(e.message); else alert('Compte créé ! Vérifie ton e-mail.');
+      if (e) setError(e.message);
+      else setSuccess('Compte créé ! Vérifie ton e-mail pour confirmer.');
     }
     setLoading(null);
   };
@@ -108,14 +111,15 @@ export default function AuthPage({
             <input type="password" placeholder="Mot de passe" value={password}
               onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleEmailAuth()}
               className="search-bar w-full px-4 py-3 text-sm outline-none" />
-            {error && <p className="text-red-500 text-xs bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="alert-error">{error}</p>}
+            {success && <p className="alert-success">{success}</p>}
             <button onClick={handleEmailAuth} disabled={!!loading}
               className="btn-buyer w-full py-3.5 text-sm">
               {loading === 'email' ? '...' : view === 'login' ? 'Se connecter' : 'Créer un compte'}
             </button>
           </div>
 
-          <button onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setError(null); }}
+          <button onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setError(null); setSuccess(null); }}
             className="w-full mt-4 text-sm text-buyer font-semibold">
             {view === 'login' ? "Pas de compte ? S'inscrire" : 'Déjà membre ?'}
           </button>

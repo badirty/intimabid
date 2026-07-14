@@ -32,7 +32,9 @@ export default function SellerShop({
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="animate-slide-up">
+    <div className="fixed inset-0 z-[60] flex flex-col animate-slide-up left-1/2 -translate-x-1/2 w-full max-w-[430px] overflow-y-auto"
+      style={{ background: 'linear-gradient(180deg, #06040a 0%, #0d0b18 100%)' }}
+    >
       <div className="header-dark px-4 py-3 flex items-center gap-3">
         <button
           type="button"

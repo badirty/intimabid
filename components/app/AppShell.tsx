@@ -23,6 +23,8 @@ export default function AppShell({
   const [tab, setTab] = useState<Tab>('home');
   const [notifCount, setNotifCount] = useState(0);
   const [walletVersion, setWalletVersion] = useState(0);
+  const [hideNav, setHideNav] = useState(false);
+  const [openAuctionId, setOpenAuctionId] = useState<string | null>(null);
 
   const refreshNotifs = useCallback(async () => {
     setNotifCount(await getUnreadNotificationCount(user.id));
@@ -41,6 +43,11 @@ export default function AppShell({
 
   const goWallet = () => setTab('wallet');
   const bumpWallet = () => setWalletVersion((v) => v + 1);
+
+  const handleOpenAuctionFromNotif = (auctionId: string) => {
+    setTab('home');
+    setOpenAuctionId(auctionId);
+  };
 
   const content = () => {
     if (tab === 'wallet') {
@@ -68,40 +75,56 @@ export default function AppShell({
       );
     }
     if (tab === 'notifications') {
-      return <NotificationsScreen userId={user.id} />;
+      return (
+        <NotificationsScreen
+          userId={user.id}
+          onOpenAuction={handleOpenAuctionFromNotif}
+        />
+      );
     }
-    return <UnifiedHome userId={user.id} onWalletNeeded={goWallet} />;
+    return (
+      <UnifiedHome
+        userId={user.id}
+        onWalletNeeded={goWallet}
+        onOverlayChange={setHideNav}
+        initialAuctionId={openAuctionId}
+        onAuctionOpened={() => setOpenAuctionId(null)}
+      />
+    );
   };
 
   return (
     <div className="app-shell">
-      {/* Header */}
-      <div
-        className="header-dark px-4 py-2.5 flex items-center justify-between shrink-0 z-20 relative"
-        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
-            <GhostLogo size={22} />
+      {!hideNav && (
+        <div
+          className="header-dark px-4 py-2.5 flex items-center justify-between shrink-0 z-20 relative"
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
+              <GhostLogo size={22} />
+            </div>
+            <span
+              className="text-sm font-extrabold tracking-wider text-white/90"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              badirty
+            </span>
           </div>
-          <span
-            className="text-sm font-extrabold tracking-wider text-white/90"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            badirty
-          </span>
         </div>
-      </div>
+      )}
 
-      <main className="flex-1 overflow-y-auto pb-24 relative z-10">
+      <main className={`flex-1 overflow-y-auto relative z-10 ${hideNav ? '' : 'pb-24'}`}>
         {content()}
       </main>
 
-      <BottomNav
-        active={tab}
-        onChange={(t) => { setTab(t); if (t === 'notifications') refreshNotifs(); }}
-        notifCount={notifCount}
-      />
+      {!hideNav && (
+        <BottomNav
+          active={tab}
+          onChange={(t) => { setTab(t); if (t === 'notifications') refreshNotifs(); }}
+          notifCount={notifCount}
+        />
+      )}
     </div>
   );
 }

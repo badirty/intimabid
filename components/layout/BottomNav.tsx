@@ -4,8 +4,8 @@ import { Home, Bell, User } from 'lucide-react';
 import type { Tab } from '@/lib/types';
 
 const ITEMS: { tab: Tab; icon: typeof Home; label: string }[] = [
-  { tab: 'home', icon: Home, label: 'Home' },
-  { tab: 'notifications', icon: Bell, label: 'Notifs' },
+  { tab: 'home', icon: Home, label: 'Accueil' },
+  { tab: 'notifications', icon: Bell, label: 'Alertes' },
   { tab: 'profile', icon: User, label: 'Profil' },
 ];
 

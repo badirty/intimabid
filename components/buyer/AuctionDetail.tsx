@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Flame, Heart, Clock } from 'lucide-react';
+import { ArrowLeft, Flame, Heart, Clock, Zap } from 'lucide-react';
 import type { Auction } from '@/lib/types';
 import { centsToEuros, isAuctionLive } from '@/lib/format';
 import { fetchAuctionById, fetchBidHistory } from '@/lib/db';
@@ -15,9 +15,9 @@ type BidEntry = { bidder_name: string; amount_cents: number; created_at: string 
 
 export default function AuctionDetail({
   item,
-  userId,
   onClose,
   onBid,
+  onBuyNow,
   onFavorite,
   onWalletNeeded,
 }: {
@@ -25,6 +25,7 @@ export default function AuctionDetail({
   userId: string;
   onClose: () => void;
   onBid: (auction: Auction, amountCents: number) => Promise<void>;
+  onBuyNow?: (auction: Auction) => Promise<void>;
   onFavorite: (auction: Auction) => Promise<void>;
   onWalletNeeded?: () => void;
 }) {
@@ -32,11 +33,20 @@ export default function AuctionDetail({
   const countdown = useCountdown(currentItem.ends_at);
   const live = isAuctionLive(currentItem.status, currentItem.ends_at);
   const price = centsToEuros(currentItem.current_price_cents);
+  const buyNowPrice = currentItem.buy_now_price_cents
+    ? centsToEuros(currentItem.buy_now_price_cents)
+    : null;
   const [bidding, setBidding] = useState(false);
+  const [buying, setBuying] = useState(false);
   const [bidHistory, setBidHistory] = useState<BidEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [bidModal, setBidModal] = useState(false);
   const [favving, setFavving] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
 
   useEffect(() => {
     fetchBidHistory(item.id)
@@ -64,6 +74,16 @@ export default function AuctionDetail({
     finally { setBidding(false); }
   }, [currentItem, onBid]);
 
+  const handleBuyNow = async () => {
+    if (!onBuyNow) return;
+    setBuying(true);
+    try {
+      await onBuyNow(currentItem);
+      onClose();
+    } catch { /* handled by parent */ }
+    finally { setBuying(false); }
+  };
+
   const handleCustomBid = async (cents: number) => {
     await onBid(currentItem, cents);
     const [history, fresh] = await Promise.all([
@@ -85,10 +105,12 @@ export default function AuctionDetail({
   };
 
   return (
-    <div className="app-shell relative animate-slide-up">
-      {/* Header with back button */}
+    <div
+      className="fixed inset-0 z-[60] flex flex-col animate-slide-up left-1/2 -translate-x-1/2 w-full max-w-[430px]"
+      style={{ background: 'linear-gradient(180deg, #06040a 0%, #0d0b18 100%)' }}
+    >
       <div
-        className="header-dark px-4 py-3 flex items-center gap-3 shrink-0 z-10"
+        className="header-dark px-4 py-3 flex items-center gap-3 shrink-0"
         style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
       >
         <button
@@ -100,7 +122,7 @@ export default function AuctionDetail({
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-white font-bold text-sm truncate">{currentItem.title}</p>
-          <p className="text-white/50 text-xs">{currentItem.seller_name}</p>
+          <p className="text-white/50 text-xs">@{currentItem.seller_name}</p>
         </div>
         <button
           onClick={handleFavorite}
@@ -111,8 +133,7 @@ export default function AuctionDetail({
         </button>
       </div>
 
-      <main className="flex-1 overflow-y-auto pb-24">
-        {/* Image area */}
+      <main className="flex-1 overflow-y-auto pb-36">
         <div className={`relative h-64 sm:h-72 bg-gradient-to-br ${currentItem.image_color} flex items-center justify-center`}>
           {currentItem.image_url && (
             <img src={currentItem.image_url} alt={currentItem.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -127,9 +148,13 @@ export default function AuctionDetail({
               <Flame className="w-3 h-3" /> LIVE
             </span>
           )}
+          {live && buyNowPrice && (
+            <span className="buy-now-badge absolute top-4 left-4 flex items-center gap-1">
+              <Zap className="w-3 h-3" /> {buyNowPrice} €
+            </span>
+          )}
         </div>
 
-        {/* Price & timer */}
         <div className="px-5 py-4">
           <div className="flex items-baseline justify-between">
             <div>
@@ -155,19 +180,22 @@ export default function AuctionDetail({
 
           {(currentItem.bid_count ?? 0) > 0 && (
             <p className="text-text-2 text-sm mt-3">
-              {currentItem.bid_count} offre{currentItem.bid_count !== 1 ? 's' : ''} · Incrément minimum : {centsToEuros(currentItem.bid_increment_cents)} €
+              {currentItem.bid_count} offre{currentItem.bid_count !== 1 ? 's' : ''} · Incrément : {centsToEuros(currentItem.bid_increment_cents)} €
+            </p>
+          )}
+          {live && buyNowPrice && (
+            <p className="text-accent text-sm font-semibold mt-2">
+              Achat immédiat disponible à {buyNowPrice} €
             </p>
           )}
         </div>
 
-        {/* Description */}
         {currentItem.description && (
           <div className="px-5 mb-4">
             <p className="text-text-2 text-sm leading-relaxed">{currentItem.description}</p>
           </div>
         )}
 
-        {/* Bid History */}
         <div className="px-5 mb-4">
           <h3 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4" /> Historique des offres
@@ -181,16 +209,16 @@ export default function AuctionDetail({
             </div>
           ) : (
             <div className="space-y-1.5">
-              {bidHistory.map((bid, i) => (
+              {bidHistory.map((bid) => (
                 <div
-                  key={i}
+                  key={`${bid.created_at}-${bid.amount_cents}`}
                   className={`flex items-center justify-between py-2.5 px-4 rounded-xl ${
-                    i === 0 ? 'bg-buyer/10 border border-buyer/20' : 'bg-white/70 border border-border'
+                    bid === bidHistory[0] ? 'bid-history-row-top' : 'bid-history-row'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-bold text-sm text-text truncate">{bid.bidder_name}</span>
-                    {i === 0 && (
+                    {bid === bidHistory[0] && (
                       <span className="text-[10px] bg-buyer text-white px-1.5 py-0.5 rounded-full font-bold shrink-0">
                         TOP
                       </span>
@@ -209,12 +237,21 @@ export default function AuctionDetail({
         </div>
       </main>
 
-      {/* Bottom action bar */}
       {live && (
         <div
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] p-4 bg-white/95 backdrop-blur-md border-t border-border z-30"
+          className="detail-action-bar fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] p-4 z-[70]"
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
+          {buyNowPrice && onBuyNow && (
+            <button
+              onClick={handleBuyNow}
+              disabled={buying}
+              className="btn-accent w-full py-3 text-sm mb-2 flex items-center justify-center gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              {buying ? '...' : `Acheter maintenant · ${buyNowPrice} €`}
+            </button>
+          )}
           <div className="flex gap-2">
             <button
               onClick={quickBid}
@@ -239,6 +276,7 @@ export default function AuctionDetail({
           minCents={currentItem.current_price_cents + currentItem.bid_increment_cents}
           onClose={() => setBidModal(false)}
           onSubmit={handleCustomBid}
+          onWalletNeeded={onWalletNeeded}
         />
       )}
     </div>

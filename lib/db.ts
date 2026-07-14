@@ -195,6 +195,49 @@ export async function placeBid(auctionId: string, amountCents: number) {
   return data;
 }
 
+export async function buyNow(auctionId: string) {
+  const { data, error } = await supabase.rpc('buy_now', { p_auction_id: auctionId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function fetchTopSellers(limit = 6): Promise<SellerSearchResult[]> {
+  await closeExpiredAuctions();
+  const { data: auctions, error } = await supabase
+    .from('auctions')
+    .select('seller_id, status')
+    .in('status', ['live', 'sold']);
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+
+  const liveCount: Record<string, number> = {};
+  const salesCount: Record<string, number> = {};
+  for (const a of auctions ?? []) {
+    if (a.status === 'live') liveCount[a.seller_id] = (liveCount[a.seller_id] ?? 0) + 1;
+    if (a.status === 'sold') salesCount[a.seller_id] = (salesCount[a.seller_id] ?? 0) + 1;
+  }
+
+  const ids = Object.keys(liveCount).sort((a, b) => liveCount[b] - liveCount[a]).slice(0, limit);
+  if (!ids.length) return [];
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', ids);
+
+  return (profiles ?? [])
+    .map((p) => ({
+      id: p.id,
+      display_name: p.display_name ?? 'Vendeur',
+      live_count: liveCount[p.id] ?? 0,
+      total_sales: salesCount[p.id] ?? 0,
+    }))
+    .sort((a, b) => b.live_count - a.live_count);
+}
+
 export async function createAuction(
   sellerId: string,
   title: string,
