@@ -41,6 +41,7 @@ export default function UnifiedHome({
 
   // Create form state
   const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
   const [startPrice, setStartPrice] = useState('5');
   const [durationHours, setDurationHours] = useState(24);
   const [isCustomDuration, setIsCustomDuration] = useState(false);
@@ -56,6 +57,13 @@ export default function UnifiedHome({
       if (imagePreview) URL.revokeObjectURL(imagePreview);
     };
   }, [imagePreview]);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [showCreate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,8 +118,17 @@ export default function UnifiedHome({
     try {
       const imageUrl = await uploadAuctionImage(imageFile);
       const buyNowCents = buyNowPrice ? eurosToCents(parseFloat(buyNowPrice.replace(',', '.'))) : undefined;
-      await createAuction(userId, createTitle.trim(), priceCents, durationHours, imageUrl, buyNowCents);
+      await createAuction(
+        userId,
+        createTitle.trim(),
+        priceCents,
+        durationHours,
+        imageUrl,
+        buyNowCents,
+        createDescription.trim() || null,
+      );
       setCreateTitle('');
+      setCreateDescription('');
       setStartPrice('5');
       setDurationHours(24);
       setIsCustomDuration(false);
@@ -188,117 +205,214 @@ export default function UnifiedHome({
         ))}
       </div>
 
-      <button onClick={() => setShowCreate(true)} className="fab" aria-label="Créer une enchère">
-        <Plus className="w-6 h-6" />
-      </button>
+      {!showCreate && (
+        <button
+          type="button"
+          onClick={() => { setCreateError(null); setShowCreate(true); }}
+          className="fab"
+          aria-label="Créer une enchère"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
-      {/* Create Modal */}
+      {/* Create sheet — plein écran iPhone */}
       {showCreate && (
-        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-end justify-center"
-          onClick={() => setShowCreate(false)}>
-          <div className="w-full max-w-[430px] bg-[#14101f] border border-white/10 rounded-3xl mx-4 mb-4 p-5 animate-slide-up max-h-[85vh] overflow-y-auto shadow-2xl"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-extrabold text-lg" style={{ fontFamily: 'var(--font-display)' }}>Nouvelle enchère</h3>
-              <button onClick={() => setShowCreate(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors">
-                <X className="w-4 h-4 text-white/60" />
+        <div
+          className="create-modal-overlay animate-slide-up"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-auction-title"
+        >
+          <div className="create-modal-panel">
+            <header className="create-modal-header">
+              <h3
+                id="create-auction-title"
+                className="font-extrabold text-base text-white"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                Nouvelle enchère
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4 text-white/80" />
               </button>
-            </div>
+            </header>
 
-            <input placeholder="Titre de l'article..." value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)} className="search-bar w-full px-4 py-3 text-sm mb-3" />
-
-            {/* Photo (obligatoire) */}
-            <div className="mb-3">
-              <p className="text-xs text-white/50 font-semibold mb-1.5">Photo <span className="text-rose">*</span></p>
-              {imagePreview ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  <img src={imagePreview} alt="Aperçu" className="w-full h-44 object-cover" />
-                  <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                    <X className="w-4 h-4 text-white" />
+            <div className="create-modal-body space-y-4">
+              {/* 1. Photo */}
+              <div className="create-field">
+                <label className="form-label">Photo <span className="text-rose">*</span></label>
+                {imagePreview ? (
+                  <div className="relative rounded-2xl overflow-hidden aspect-[16/10] max-h-[180px]">
+                    <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(null); }}
+                      className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/70 flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="create-photo-zone"
+                  >
+                    <Camera className="w-9 h-9 text-accent" />
+                    <span className="text-sm font-bold text-white/90">Tap pour ajouter une photo</span>
+                    <span className="text-xs text-white/50">JPG · PNG · WebP · max 5 Mo</span>
                   </button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className="w-full rounded-xl py-10 flex flex-col items-center gap-2 bg-white/5 border-2 border-dashed border-white/10 hover:border-accent/40 transition-colors">
-                  <Camera className="w-8 h-8 text-white/40" />
-                  <span className="text-sm font-semibold text-white/40">Ajouter une photo</span>
-                  <span className="text-xs text-white/20">Obligatoire</span>
-                </button>
-              )}
-              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]; if (!file) return;
-                  if (file.size > 5*1024*1024) { setCreateError('Image trop grande (max 5 Mo)'); return; }
-                  setImageFile(file); setImagePreview(URL.createObjectURL(file));
-                }} />
-            </div>
-
-            {/* Prix */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Prix de départ</label>
-                <div className="relative">
-                  <input type="text" inputMode="decimal" placeholder="0,00" value={startPrice}
-                    onChange={(e) => setStartPrice(e.target.value)}
-                    className="search-bar w-full px-3 py-2.5 text-sm pr-8" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 text-sm font-bold">€</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 font-semibold mb-1.5 block">Achat immédiat</label>
-                <div className="relative">
-                  <input type="text" inputMode="decimal" placeholder="Optionnel" value={buyNowPrice}
-                    onChange={(e) => setBuyNowPrice(e.target.value)}
-                    className="search-bar w-full px-3 py-2.5 text-sm pr-8" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 text-sm font-bold">€</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Durée */}
-            <div className="mb-4">
-              <p className="text-xs text-white/50 font-semibold mb-2">Durée</p>
-              <div className="flex gap-2 mb-3">
-                {DURATION_PRESETS.map(({ label, hours }) => (
-                  <button key={label}
-                    onClick={() => { setDurationHours(hours); setIsCustomDuration(false); }}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      !isCustomDuration && durationHours === hours
-                        ? 'bg-accent text-white'
-                        : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/8'
-                    }`}>
-                    {label}
-                  </button>
-                ))}
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      setCreateError('Image trop grande (max 5 Mo)');
+                      return;
+                    }
+                    setImageFile(file);
+                    setImagePreview(URL.createObjectURL(file));
+                    setCreateError(null);
+                  }}
+                />
               </div>
 
-              {/* Custom duration slider */}
-              <button type="button" onClick={() => setIsCustomDuration(true)}
-                className={`w-full py-2 rounded-xl text-xs font-semibold mb-2 transition-colors ${
-                  isCustomDuration ? 'bg-accent/10 text-accent border border-accent/20' : 'text-white/30 hover:text-white/50'
-                }`}>
-                <Clock className="w-3.5 h-3.5 inline mr-1" />
-                Durée personnalisée : <span className="font-bold">{formatDuration(durationHours)}</span>
-              </button>
-              {isCustomDuration && (
-                <div className="px-1">
-                  <input type="range" min="0.05" max="96" step="0.05" value={durationHours}
-                    onChange={(e) => setDurationHours(parseFloat(e.target.value))}
-                    className="w-full h-2 rounded-full appearance-none bg-white/10 accent-accent cursor-pointer" />
-                  <div className="flex justify-between text-[10px] text-white/30 mt-1">
-                    <span>3 min</span><span>24h</span><span>48h</span><span>72h</span><span>96h</span>
+              {/* 2. Titre */}
+              <div className="create-field">
+                <label className="form-label" htmlFor="auction-title">Titre</label>
+                <input
+                  id="auction-title"
+                  placeholder="Ex : Ensemble lingerie noire"
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  className="search-bar w-full px-4 py-3 text-sm outline-none"
+                />
+              </div>
+
+              {/* 3. Description */}
+              <div className="create-field">
+                <label className="form-label" htmlFor="auction-desc">Description</label>
+                <textarea
+                  id="auction-desc"
+                  placeholder="État, taille, détails sur l'article..."
+                  value={createDescription}
+                  onChange={(e) => setCreateDescription(e.target.value)}
+                  className="textarea-bar w-full px-4 py-3 text-sm"
+                  rows={3}
+                />
+              </div>
+
+              {/* 4. Prix */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="create-field">
+                  <label className="form-label" htmlFor="start-price">Prix de départ</label>
+                  <div className="relative">
+                    <input
+                      id="start-price"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="5"
+                      value={startPrice}
+                      onChange={(e) => setStartPrice(e.target.value)}
+                      className="search-bar w-full px-3 py-3 text-sm pr-8 outline-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-sm font-bold">€</span>
                   </div>
                 </div>
+                <div className="create-field">
+                  <label className="form-label" htmlFor="buy-now">Achat immédiat</label>
+                  <div className="relative">
+                    <input
+                      id="buy-now"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Optionnel"
+                      value={buyNowPrice}
+                      onChange={(e) => setBuyNowPrice(e.target.value)}
+                      className="search-bar w-full px-3 py-3 text-sm pr-8 outline-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-sm font-bold">€</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Durée */}
+              <div className="create-field">
+                <label className="form-label">Durée</label>
+                <div className="flex gap-2">
+                  {DURATION_PRESETS.map(({ label, hours }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => { setDurationHours(hours); setIsCustomDuration(false); }}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                        !isCustomDuration && durationHours === hours
+                          ? 'bg-accent text-white'
+                          : 'bg-white/5 border border-white/10 text-white/60'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomDuration((v) => !v)}
+                  className={`w-full mt-2 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    isCustomDuration
+                      ? 'bg-accent/15 text-accent border border-accent/25'
+                      : 'text-white/40 border border-white/8'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                  {isCustomDuration ? formatDuration(durationHours) : 'Durée personnalisée'}
+                </button>
+                {isCustomDuration && (
+                  <div className="pt-1 px-0.5">
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="96"
+                      step="0.05"
+                      value={durationHours}
+                      onChange={(e) => setDurationHours(parseFloat(e.target.value))}
+                      className="w-full h-2 rounded-full appearance-none bg-white/10 accent-accent cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-white/35 mt-1">
+                      <span>3 min</span><span>24h</span><span>48h</span><span>72h</span><span>96h</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {createError && (
+                <p className="text-rose text-sm bg-rose/10 border border-rose/20 rounded-xl px-4 py-2.5">
+                  {createError}
+                </p>
               )}
             </div>
 
-            {createError && <p className="text-rose text-sm bg-rose/10 rounded-xl px-4 py-2 mb-3">{createError}</p>}
-
-            <button onClick={handleCreate} disabled={creating} className="btn-accent w-full py-4 text-sm">
-              {creating ? 'Lancement...' : "Lancer l'enchère"}
-            </button>
+            <footer className="create-modal-footer">
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={creating}
+                className="btn-accent w-full py-4 text-sm disabled:opacity-60"
+              >
+                {creating ? 'Lancement...' : "Lancer l'enchère"}
+              </button>
+            </footer>
           </div>
         </div>
       )}
