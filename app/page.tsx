@@ -6,16 +6,20 @@ import { supabase } from '@/lib/supabase';
 import { hasCompletedOnboarding, getPreferredMode } from '@/lib/auth';
 import type { PreferredMode } from '@/lib/types';
 import AuthPage from '@/components/auth/AuthPage';
+import LandingPage from '@/components/landing/LandingPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
 import AppShell from '@/components/app/AppShell';
 import { ensureUserBootstrap } from '@/lib/db';
 import GhostLogo from '@/components/brand/GhostLogo';
+
+type UnauthView = 'landing' | 'login' | 'signup';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [onboarded, setOnboarded] = useState(false);
   const [preferredMode, setPreferredMode] = useState<PreferredMode>('both');
   const [loading, setLoading] = useState(true);
+  const [unauthView, setUnauthView] = useState<UnauthView>('landing');
 
   const syncUser = (sessionUser: User | null) => {
     setUser(sessionUser);
@@ -90,8 +94,13 @@ export default function Home() {
   }
 
   if (!user) {
+    if (unauthView === 'landing') {
+      return <LandingPage onNavigate={(v) => setUnauthView(v)} />;
+    }
     return (
       <AuthPage
+        initialView={unauthView}
+        onBack={() => setUnauthView('landing')}
         onAuthSuccess={() =>
           supabase.auth.getSession().then(({ data }) => syncUser(data.session?.user ?? null))
         }

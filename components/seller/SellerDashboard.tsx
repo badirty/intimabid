@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Shirt } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Shirt, Camera, X } from 'lucide-react';
 import { centsToEuros, eurosToCents, IMAGE_COLORS } from '@/lib/format';
-import { createAuction, fetchSellerAuctions, fetchWallet, requestWithdrawal } from '@/lib/db';
+import { createAuction, fetchSellerAuctions, fetchWallet, requestWithdrawal, uploadAuctionImage } from '@/lib/db';
 
 const DURATIONS: Record<string, number> = { '3j': 3, '5j': 5, '7j': 7 };
 
@@ -24,6 +24,16 @@ export default function SellerDashboard({
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cleanup object URL on unmount or preview change
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,14 +53,21 @@ export default function SellerDashboard({
     setCreating(true);
     setError(null);
     try {
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        imageUrl = await uploadAuctionImage(imageFile);
+      }
       await createAuction(
         userId,
         title.trim(),
         eurosToCents(startPrice),
         DURATIONS[duration],
         IMAGE_COLORS[colorIdx],
+        imageUrl,
       );
       setTitle('');
+      setImageFile(null);
+      setImagePreview(null);
       setToast('Enchère lancée !');
       await load();
     } catch (e) {
@@ -110,14 +127,57 @@ export default function SellerDashboard({
             className="search-bar w-full px-4 py-3 text-sm mb-4 outline-none"
           />
 
-          <button
-            type="button"
-            onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
-            className={`w-full rounded-xl py-8 flex flex-col items-center gap-2 mb-4 bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} relative overflow-hidden`}
-          >
-            <Shirt className="w-10 h-10 text-white/80" />
-            <span className="text-sm font-semibold text-white/90">Aperçu couleur · tap pour changer</span>
-          </button>
+          {/* Image upload */}
+          <div className="mb-4">
+            {imagePreview ? (
+              <div className="relative rounded-xl overflow-hidden">
+                <img src={imagePreview} alt="Aperçu" className="w-full h-48 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); setImagePreview(null); }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full rounded-xl py-8 flex flex-col items-center gap-2 bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} relative overflow-hidden`}
+              >
+                <Camera className="w-10 h-10 text-white/80" />
+                <span className="text-sm font-semibold text-white/90">Ajouter une photo · tap pour changer la couleur</span>
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  setError('Image trop grande (max 5 Mo)');
+                  return;
+                }
+                setImageFile(file);
+                setImagePreview(URL.createObjectURL(file));
+              }}
+            />
+          </div>
+
+          {!imagePreview && (
+            <button
+              type="button"
+              onClick={() => setColorIdx((i) => (i + 1) % IMAGE_COLORS.length)}
+              className={`w-full rounded-xl py-8 flex flex-col items-center gap-2 mb-4 bg-gradient-to-br ${IMAGE_COLORS[colorIdx]} relative overflow-hidden`}
+            >
+              <Shirt className="w-10 h-10 text-white/80" />
+              <span className="text-sm font-semibold text-white/90">Aperçu couleur · tap pour changer</span>
+            </button>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">

@@ -8,6 +8,7 @@ import { centsToEuros, isAuctionLive } from '@/lib/format';
 import { fetchEndedAuctions, fetchFavorites, fetchLiveAuctions, placeBid, toggleFavorite } from '@/lib/db';
 import { useCountdown } from '@/hooks/useCountdown';
 import BidModal from '@/components/buyer/BidModal';
+import AuctionDetail from '@/components/buyer/AuctionDetail';
 
 type BuyerTab = 'live' | 'favorites' | 'ended';
 
@@ -27,6 +28,7 @@ export default function BuyerHome({
   const [favorites, setFavorites] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [bidModal, setBidModal] = useState<Auction | null>(null);
+  const [detailAuction, setDetailAuction] = useState<Auction | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -75,6 +77,19 @@ export default function BuyerHome({
     await toggleFavorite(userId, auction.id, !!auction.is_favorite);
     await load();
   };
+
+  if (detailAuction) {
+    return (
+      <AuctionDetail
+        item={detailAuction}
+        userId={userId}
+        onClose={() => { setDetailAuction(null); load(); }}
+        onBid={handleBid}
+        onFavorite={handleFavorite}
+        onWalletNeeded={onWalletNeeded}
+      />
+    );
+  }
 
   return (
     <div className="animate-slide-up">
@@ -138,6 +153,7 @@ export default function BuyerHome({
             key={item.id}
             item={item}
             featured={i === 0 && tab === 'live'}
+            onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onCustomBid={() => setBidModal(item)}
             onFavorite={() => handleFavorite(item)}
@@ -161,6 +177,7 @@ export default function BuyerHome({
 function AuctionCard({
   item,
   featured,
+  onPress,
   onBid,
   onCustomBid,
   onFavorite,
@@ -168,6 +185,7 @@ function AuctionCard({
 }: {
   item: Auction;
   featured?: boolean;
+  onPress?: () => void;
   onBid: (cents: number) => Promise<void>;
   onCustomBid: () => void;
   onFavorite: () => void;
@@ -187,8 +205,11 @@ function AuctionCard({
   };
 
   return (
-    <div className="ui-card overflow-hidden">
+    <div className="ui-card overflow-hidden cursor-pointer" onClick={onPress}>
       <div className={`relative ${featured ? 'h-52' : 'h-36'} bg-gradient-to-br ${item.image_color}`}>
+        {item.image_url && (
+          <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
+        )}
         {live && (
           <span className="live-pill absolute top-3 right-3 flex items-center gap-1">
             <Flame className="w-3 h-3" /> LIVE
@@ -200,7 +221,7 @@ function AuctionCard({
           </span>
         )}
         <button
-          onClick={onFavorite}
+          onClick={(e) => { e.stopPropagation(); onFavorite(); }}
           className="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center"
         >
           <Heart className={`w-4 h-4 ${item.is_favorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
@@ -231,15 +252,15 @@ function AuctionCard({
 
         {live && featured && (
           <div className="flex gap-2 mt-4">
-            <button onClick={quickBid} disabled={bidding} className="btn-buyer flex-1 py-3.5 text-sm">
+            <button onClick={(e) => { e.stopPropagation(); quickBid(); }} disabled={bidding} className="btn-buyer flex-1 py-3.5 text-sm">
               {bidding ? '...' : `PLACER OFFRE (+${centsToEuros(item.bid_increment_cents)}€)`}
             </button>
-            <button onClick={onCustomBid} className="btn-buyer-alt flex-1 py-3.5 text-sm">OFFRE PERSO</button>
+            <button onClick={(e) => { e.stopPropagation(); onCustomBid(); }} className="btn-buyer-alt flex-1 py-3.5 text-sm">OFFRE PERSO</button>
           </div>
         )}
 
         {live && !featured && (
-          <button onClick={quickBid} disabled={bidding} className="btn-buyer w-full py-2.5 text-sm mt-3">
+          <button onClick={(e) => { e.stopPropagation(); quickBid(); }} disabled={bidding} className="btn-buyer w-full py-2.5 text-sm mt-3">
             {bidding ? '...' : `Enchérir · ${price} €`}
           </button>
         )}

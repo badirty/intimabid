@@ -8,8 +8,16 @@ import { GoogleIcon, XIcon } from '@/components/icons';
 import GhostLogo from '@/components/brand/GhostLogo';
 type AuthView = 'login' | 'signup';
 
-export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void }) {
-  const [view, setView] = useState<AuthView>('login');
+export default function AuthPage({
+  onAuthSuccess,
+  onBack,
+  initialView = 'login',
+}: {
+  onAuthSuccess?: () => void;
+  onBack?: () => void;
+  initialView?: AuthView;
+}) {
+  const [view, setView] = useState<AuthView>(initialView);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState<string | null>(null);
@@ -56,6 +64,15 @@ export default function AuthPage({ onAuthSuccess }: { onAuthSuccess?: () => void
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="w-full max-w-sm animate-slide-up">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-text-3 mb-4 text-sm font-semibold hover:text-text-2 transition-colors"
+          >
+            ← Retour
+          </button>
+        )}
         <div className="text-center mb-8">
           <div className="ghost-logo-wrap w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-ghost-float">
             <GhostLogo size={52} />

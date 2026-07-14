@@ -114,6 +114,7 @@ function mapAuctionRow(row: Record<string, unknown>, sellerName?: string): Aucti
     status: row.status as Auction['status'],
     ends_at: row.ends_at as string,
     image_color: row.image_color as string,
+    image_url: (row.image_url as string) ?? null,
     winner_id: (row.winner_id as string) ?? null,
     created_at: row.created_at as string,
     seller_name: sellerName ?? 'Vendeur',
@@ -143,6 +144,7 @@ export async function createAuction(
   startPriceCents: number,
   durationDays: number,
   imageColor: string,
+  imageUrl?: string | null,
 ) {
   const endsAt = durationDaysToEndsAt(durationDays);
   const { data, error } = await supabase
@@ -154,6 +156,7 @@ export async function createAuction(
       current_price_cents: startPriceCents,
       ends_at: endsAt,
       image_color: imageColor,
+      image_url: imageUrl ?? null,
       status: 'live',
     })
     .select()
@@ -161,6 +164,31 @@ export async function createAuction(
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function uploadAuctionImage(file: File): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('auction-images')
+    .upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    if (error.message?.includes('Bucket') || error.message?.includes('not found')) {
+      throw new Error('Stockage non configuré. Exécute supabase/migrations/005_storage_images.sql dans Supabase.');
+    }
+    throw new Error(error.message);
+  }
+
+  const { data: publicUrl } = supabase.storage
+    .from('auction-images')
+    .getPublicUrl(fileName);
+
+  return publicUrl.publicUrl;
 }
 
 export async function fetchSellerAuctions(sellerId: string) {
@@ -305,6 +333,37 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
 
   if (error) return 0;
   return count ?? 0;
+}
+
+export async function fetchAuctionById(auctionId: string): Promise<Auction | null> {
+  const { data, error } = await supabase
+    .from('auctions')
+    .select('*')
+    .eq('id', auctionId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return mapAuctionRow(data as Record<string, unknown>);
+}
+
+export async function fetchBidHistory(auctionId: string): Promise<{ bidder_name: string; amount_cents: number; created_at: string }[]> {
+  const { data, error } = await supabase
+    .from('bids')
+    .select('amount_cents, created_at, bidder_id, profiles(display_name)')
+    .eq('auction_id', auctionId)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+
+  return (data ?? []).map((b: Record<string, unknown>) => ({
+    bidder_name: ((b.profiles as Record<string, unknown> | null)?.display_name as string) ?? 'Anonyme',
+    amount_cents: b.amount_cents as number,
+    created_at: b.created_at as string,
+  }));
 }
 
 export { eurosToCents };

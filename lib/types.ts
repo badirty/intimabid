@@ -15,6 +15,7 @@ export interface Auction {
   status: AuctionStatus;
   ends_at: string;
   image_color: string;
+  image_url: string | null;
   winner_id: string | null;
   created_at: string;
   seller_name?: string;
