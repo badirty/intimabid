@@ -5,6 +5,7 @@ import type { Provider } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/auth-redirect';
 import { GoogleIcon, XIcon } from '@/components/icons';
+import BadirtyLogo from '@/components/brand/BadirtyLogo';
 import GhostLogo from '@/components/brand/GhostLogo';
 type AuthView = 'login' | 'signup';
 
@@ -80,7 +81,7 @@ export default function AuthPage({
           <div className="ghost-logo-wrap w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-ghost-float">
             <GhostLogo size={52} />
           </div>
-          <h1 className="text-3xl font-extrabold text-text" style={{ fontFamily: 'var(--font-display)' }}>badirty</h1>
+          <BadirtyLogo size="hero" className="h-12 w-auto mx-auto" priority />
           <p className="text-text-2 text-sm mt-2">Enchères privées · vibe ghost</p>
         </div>
 

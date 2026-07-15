@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ShoppingBag, Store, Zap, Eye, Shield, Sparkles, Flame } from 'lucide-react';
+import BadirtyLogo from '@/components/brand/BadirtyLogo';
 import GhostLogo from '@/components/brand/GhostLogo';
 import type { Auction } from '@/lib/types';
 import { fetchLiveAuctions } from '@/lib/db';
@@ -51,12 +52,9 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
           <div className="ghost-logo-wrap w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 animate-ghost-float">
             <GhostLogo size={64} />
           </div>
-          <h1
-            className="text-5xl font-extrabold text-text mb-3 tracking-tight"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            badirty
-          </h1>
+          <div className="mb-3 flex justify-center">
+            <BadirtyLogo size="hero" className="h-16 w-auto sm:h-[4.5rem]" priority />
+          </div>
           <p className="text-text-2 text-base font-semibold leading-relaxed max-w-xs mx-auto">
             Enchères intimes en direct.
             <br />
