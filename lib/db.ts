@@ -2,7 +2,9 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
 import { resolveProfileFromUser } from '@/lib/profile';
-import type { Auction, Notification, Profile, SellerSearchResult, UserStats, Wallet, WalletTransaction } from '@/lib/types';
+import type {
+  Auction, Notification, Order, Profile, SellerSearchResult, UserAddress, UserStats, Wallet, WalletTransaction,
+} from '@/lib/types';
 import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
 export async function ensureUserBootstrap(userId: string, email?: string, user?: User | null) {
@@ -553,6 +555,150 @@ export async function fetchBidHistory(auctionId: string): Promise<{
       created_at: b.created_at as string,
     };
   });
+}
+
+export async function confirmAge(userId: string) {
+  await supabase.from('profiles').upsert(
+    { id: userId, age_confirmed_at: new Date().toISOString() },
+    { onConflict: 'id' },
+  );
+}
+
+export async function hasConfirmedAge(userId: string): Promise<boolean> {
+  const { data } = await supabase.from('profiles').select('age_confirmed_at').eq('id', userId).maybeSingle();
+  return !!data?.age_confirmed_at;
+}
+
+export async function submitReport(auctionId: string | null, reason: string, details?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Non connecté');
+  const { error } = await supabase.from('reports').insert({
+    reporter_id: user.id,
+    auction_id: auctionId,
+    reason,
+    details: details?.trim() || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function enrichOrders(rows: Record<string, unknown>[], userId: string): Promise<Order[]> {
+  const auctionIds = rows.map((r) => r.auction_id as string);
+  const { data: auctions } = auctionIds.length
+    ? await supabase.from('auctions').select('id, title, image_url').in('id', auctionIds)
+    : { data: [] };
+  const auctionMap = Object.fromEntries((auctions ?? []).map((a) => [a.id, a]));
+
+  const otherIds = rows.map((r) => (r.buyer_id === userId ? r.seller_id : r.buyer_id) as string);
+  const { data: profiles } = otherIds.length
+    ? await supabase.from('profiles').select('id, display_name').in('id', [...new Set(otherIds)])
+    : { data: [] };
+  const nameMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.display_name ?? 'Utilisateur']));
+
+  return rows.map((r) => {
+    const a = auctionMap[r.auction_id as string];
+    const otherId = r.buyer_id === userId ? r.seller_id : r.buyer_id;
+    return {
+      ...(r as unknown as Order),
+      auction_title: a?.title,
+      auction_image_url: a?.image_url ?? null,
+      counterparty_name: nameMap[otherId as string],
+    };
+  });
+}
+
+export async function fetchBuyerOrders(userId: string): Promise<Order[]> {
+  const { data, error } = await supabase.from('orders').select('*').eq('buyer_id', userId).order('created_at', { ascending: false });
+  if (error) { if (error.code === '42P01') return []; throw error; }
+  return enrichOrders((data ?? []) as Record<string, unknown>[], userId);
+}
+
+export async function fetchSellerOrders(userId: string): Promise<Order[]> {
+  const { data, error } = await supabase.from('orders').select('*').eq('seller_id', userId).order('created_at', { ascending: false });
+  if (error) { if (error.code === '42P01') return []; throw error; }
+  return enrichOrders((data ?? []) as Record<string, unknown>[], userId);
+}
+
+export async function fetchUserAddress(userId: string): Promise<UserAddress | null> {
+  const { data, error } = await supabase.from('user_addresses').select('*').eq('user_id', userId).maybeSingle();
+  if (error) { if (error.code === '42P01') return null; throw error; }
+  return data;
+}
+
+export async function saveShippingAddress(addr: Omit<UserAddress, 'user_id'>) {
+  const { error } = await supabase.rpc('save_shipping_address', {
+    p_full_name: addr.full_name,
+    p_line1: addr.line1,
+    p_line2: addr.line2 ?? '',
+    p_city: addr.city,
+    p_postal: addr.postal_code,
+    p_country: addr.country,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function submitOrderAddress(orderId: string) {
+  const { error } = await supabase.rpc('submit_order_address', { p_order_id: orderId });
+  if (error) throw new Error(error.message);
+}
+
+export async function markOrderShipped(orderId: string, tracking?: string) {
+  const { error } = await supabase.rpc('mark_order_shipped', { p_order_id: orderId, p_tracking: tracking ?? '' });
+  if (error) throw new Error(error.message);
+}
+
+export async function confirmOrderDelivered(orderId: string) {
+  const { error } = await supabase.rpc('confirm_order_delivered', { p_order_id: orderId });
+  if (error) throw new Error(error.message);
+}
+
+export async function cancelAuction(auctionId: string) {
+  const { error } = await supabase.rpc('cancel_auction', { p_auction_id: auctionId });
+  if (error) throw new Error(error.message);
+}
+
+export async function extendAuction(auctionId: string, extraHours = 1) {
+  const { error } = await supabase.rpc('extend_auction', { p_auction_id: auctionId, p_extra_hours: extraHours });
+  if (error) throw new Error(error.message);
+}
+
+export async function editAuction(auctionId: string, title?: string, description?: string) {
+  const { error } = await supabase.rpc('edit_auction', {
+    p_auction_id: auctionId,
+    p_title: title ?? null,
+    p_description: description ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchMyActiveBidAuctions(userId: string): Promise<Auction[]> {
+  const { data: bids } = await supabase.from('bids').select('auction_id').eq('bidder_id', userId);
+  const ids = [...new Set((bids ?? []).map((b) => b.auction_id))];
+  if (!ids.length) return [];
+  const { data } = await supabase.from('auctions').select('*').in('id', ids).eq('status', 'live').gt('ends_at', new Date().toISOString());
+  return enrichAuctions((data ?? []) as Record<string, unknown>[], userId);
+}
+
+export async function fetchMyWonAuctions(userId: string): Promise<Auction[]> {
+  const { data } = await supabase.from('auctions').select('*').eq('winner_id', userId).eq('status', 'sold').order('ends_at', { ascending: false }).limit(30);
+  return enrichAuctions((data ?? []) as Record<string, unknown>[], userId);
+}
+
+export async function fetchMyLostAuctions(userId: string): Promise<Auction[]> {
+  const { data: bids } = await supabase.from('bids').select('auction_id').eq('bidder_id', userId);
+  const ids = [...new Set((bids ?? []).map((b) => b.auction_id))];
+  if (!ids.length) return [];
+  const { data } = await supabase
+    .from('auctions')
+    .select('*')
+    .in('id', ids)
+    .in('status', ['sold', 'ended'])
+    .neq('winner_id', userId);
+  return enrichAuctions((data ?? []) as Record<string, unknown>[], userId);
+}
+
+export async function fetchProfileById(userId: string): Promise<SellerSearchResult | null> {
+  const stats = await fetchSellerStats(userId);
+  return stats;
 }
 
 export { eurosToCents };

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { SellerSearchResult, Tab } from '@/lib/types';
-import { fetchWallet, getUnreadNotificationCount } from '@/lib/db';
+import { fetchProfileById, fetchWallet, getUnreadNotificationCount } from '@/lib/db';
 import { centsToEuros } from '@/lib/format';
 import GhostLogo from '@/components/brand/GhostLogo';
 import BottomNav from '@/components/layout/BottomNav';
@@ -11,22 +11,35 @@ import UnifiedHome from '@/components/app/UnifiedHome';
 import ProfileScreen from '@/components/shared/ProfileScreen';
 import WalletScreen from '@/components/wallet/WalletScreen';
 import NotificationsScreen from '@/components/notifications/NotificationsScreen';
+import OrdersScreen from '@/components/orders/OrdersScreen';
+import FirstSessionTips from '@/components/onboarding/FirstSessionTips';
 
 export default function AppShell({
   user,
   onSignOut,
+  initialAuctionId,
+  initialSellerId,
 }: {
   user: User;
   onSignOut: () => void;
+  initialAuctionId?: string;
+  initialSellerId?: string;
 }) {
   const [tab, setTab] = useState<Tab>('home');
+  const [ordersMode, setOrdersMode] = useState<'buyer' | 'seller'>('buyer');
   const [notifCount, setNotifCount] = useState(0);
   const [walletVersion, setWalletVersion] = useState(0);
   const [balanceCents, setBalanceCents] = useState(0);
   const [hideNav, setHideNav] = useState(false);
-  const [openAuctionId, setOpenAuctionId] = useState<string | null>(null);
+  const [openAuctionId, setOpenAuctionId] = useState<string | null>(initialAuctionId ?? null);
   const [homeResetKey, setHomeResetKey] = useState(0);
   const [profileShop, setProfileShop] = useState<SellerSearchResult | null>(null);
+  const [deepLinkSeller, setDeepLinkSeller] = useState<SellerSearchResult | null>(null);
+
+  useEffect(() => {
+    if (!initialSellerId) return;
+    fetchProfileById(initialSellerId).then((s) => { if (s) setDeepLinkSeller(s); });
+  }, [initialSellerId]);
 
   const refreshNotifs = useCallback(async () => {
     setNotifCount(await getUnreadNotificationCount(user.id));
@@ -60,6 +73,7 @@ export default function AppShell({
     setTab('home');
     setOpenAuctionId(null);
     setProfileShop(null);
+    setDeepLinkSeller(null);
     setHomeResetKey((k) => k + 1);
   };
 
@@ -73,6 +87,25 @@ export default function AppShell({
         />
       );
     }
+    if (tab === 'orders') {
+      return (
+        <div>
+          <div className="px-4 pt-4 flex gap-2">
+            {(['buyer', 'seller'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setOrdersMode(m)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${ordersMode === m ? 'bg-accent text-white' : 'bg-white/5 text-text-3'}`}
+              >
+                {m === 'buyer' ? 'Achats' : 'Expéditions'}
+              </button>
+            ))}
+          </div>
+          <OrdersScreen userId={user.id} mode={ordersMode} />
+        </div>
+      );
+    }
     if (tab === 'profile') {
       return (
         <ProfileScreen
@@ -80,6 +113,7 @@ export default function AppShell({
           onSignOut={onSignOut}
           onWallet={goWallet}
           onOpenShop={(seller) => { setProfileShop(seller); setTab('home'); }}
+          onOpenOrders={() => setTab('orders')}
           walletVersion={walletVersion}
         />
       );
@@ -93,16 +127,19 @@ export default function AppShell({
       );
     }
     return (
-      <UnifiedHome
-        key={homeResetKey}
-        userId={user.id}
-        onWalletNeeded={goWallet}
-        onOverlayChange={setHideNav}
-        initialAuctionId={openAuctionId}
-        onAuctionOpened={() => setOpenAuctionId(null)}
-        initialSeller={profileShop}
-        onSellerOpened={() => setProfileShop(null)}
-      />
+      <>
+        <FirstSessionTips />
+        <UnifiedHome
+          key={homeResetKey}
+          userId={user.id}
+          onWalletNeeded={goWallet}
+          onOverlayChange={setHideNav}
+          initialAuctionId={openAuctionId}
+          onAuctionOpened={() => setOpenAuctionId(null)}
+          initialSeller={profileShop ?? deepLinkSeller}
+          onSellerOpened={() => { setProfileShop(null); setDeepLinkSeller(null); }}
+        />
+      </>
     );
   };
 
@@ -121,10 +158,7 @@ export default function AppShell({
             <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
               <GhostLogo size={22} />
             </div>
-            <span
-              className="text-sm font-extrabold tracking-wider text-white/90"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
+            <span className="text-sm font-extrabold tracking-wider text-white/90" style={{ fontFamily: 'var(--font-display)' }}>
               badirty
             </span>
           </button>

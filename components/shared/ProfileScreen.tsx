@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { LogOut, Wallet, Store, Pencil, Check, X } from 'lucide-react';
+import { LogOut, Wallet, Store, Pencil, Check, X, Package, Mail } from 'lucide-react';
 import { centsToEuros } from '@/lib/format';
 import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName } from '@/lib/db';
 import { resolveProfileFromUser } from '@/lib/profile';
@@ -14,12 +14,14 @@ export default function ProfileScreen({
   onSignOut,
   onWallet,
   onOpenShop,
+  onOpenOrders,
   walletVersion = 0,
 }: {
   user: User;
   onSignOut: () => void;
   onWallet?: () => void;
   onOpenShop?: (seller: SellerSearchResult) => void;
+  onOpenOrders?: () => void;
   walletVersion?: number;
 }) {
   const userId = user.id;
@@ -139,6 +141,23 @@ export default function ProfileScreen({
         <span className="text-text-3">→</span>
       </button>
 
+      {onOpenOrders && (
+        <button
+          type="button"
+          onClick={onOpenOrders}
+          className="ui-card w-full p-4 mb-3 flex items-center gap-3 hover:border-accent/30 transition-all"
+        >
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <Package className="w-5 h-5 text-accent" />
+          </div>
+          <div className="text-left flex-1">
+            <p className="font-bold text-sm">Mes commandes</p>
+            <p className="text-text-3 text-xs mt-0.5">Achats et expéditions</p>
+          </div>
+          <span className="text-text-3">→</span>
+        </button>
+      )}
+
       {onOpenShop && (
         <button
           type="button"
@@ -168,7 +187,8 @@ export default function ProfileScreen({
         ))}
       </div>
 
-      <div className="flex justify-center gap-4 text-[11px] text-text-3 mb-4">
+      <div className="flex justify-center gap-4 text-[11px] text-text-3 mb-4 flex-wrap">
+        <a href="/contact" className="hover:text-accent transition-colors flex items-center gap-1"><Mail className="w-3 h-3" /> Contact</a>
         <a href="/privacy" className="hover:text-accent transition-colors">Confidentialité</a>
         <a href="/terms" className="hover:text-accent transition-colors">CGU</a>
       </div>

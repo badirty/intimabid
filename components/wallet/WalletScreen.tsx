@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CreditCard, Sparkles } from 'lucide-react';
 import { centsToEuros, eurosToCents } from '@/lib/format';
-import { demoTopup, fetchWallet, fetchWalletTransactions, isDbReady } from '@/lib/db';
+import { demoTopup, fetchWallet, fetchWalletTransactions, isDbReady, requestWithdrawal } from '@/lib/db';
 import type { WalletTransaction } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -57,6 +57,7 @@ export default function WalletScreen({
   const [dbReady, setDbReady] = useState(true);
   const [busy, setBusy] = useState(false);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [withdrawEuros, setWithdrawEuros] = useState(10);
   const paymentHandled = useRef(false);
 
   const stripeEnabled = !!config?.stripe;
@@ -356,6 +357,66 @@ export default function WalletScreen({
             {busy ? 'Recharge…' : stripeEnabled ? 'Recharger (démo test)' : 'Recharger'}
           </button>
         )}
+      </div>
+
+      <div className="ui-card p-5 mb-3">
+        <h2 className="font-bold text-sm mb-3">Retirer (vendeur)</h2>
+        <p className="text-text-3 text-xs mb-3">Demande un virement ou configure Stripe Connect.</p>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="number"
+            min={1}
+            max={500}
+            value={withdrawEuros}
+            onChange={(e) => setWithdrawEuros(parseFloat(e.target.value) || 0)}
+            className="search-bar flex-1 px-3 py-2.5 text-sm"
+          />
+          <span className="text-text-3 text-sm self-center">€</span>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await requestWithdrawal(Math.round(withdrawEuros * 100));
+              setMsg('Demande de retrait enregistrée');
+              await load();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Erreur');
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="btn-ghost w-full py-2.5 text-xs mb-2"
+        >
+          Demander un retrait
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              const res = await fetch('/api/stripe/connect/onboard', {
+                method: 'POST',
+                headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+              });
+              const data = await res.json();
+              if (data.url) window.location.assign(data.url);
+              else setError(data.error ?? 'Erreur Stripe Connect');
+            } catch {
+              setError('Stripe Connect indisponible');
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="btn-accent w-full py-2.5 text-xs"
+        >
+          Configurer Stripe Connect
+        </button>
       </div>
 
       {transactions.length > 0 && (

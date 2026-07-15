@@ -4,19 +4,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Flame, Heart, Plus, Camera, X, Clock, Store, Zap, TrendingUp } from 'lucide-react';
 import GhostLogo from '@/components/brand/GhostLogo';
 import UserAvatar from '@/components/brand/UserAvatar';
-import type { Auction, SellerSearchResult } from '@/lib/types';
+import type { Auction, HomeTab, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, eurosToCents, isAuctionLive } from '@/lib/format';
 import {
   fetchAuctionById, fetchEndedAuctions, fetchFavorites, fetchLiveAuctions,
   fetchSellerAuctions, fetchTopSellers, buyNow, placeBid, toggleFavorite,
   createAuction, uploadAuctionImage, searchSellers,
+  fetchMyActiveBidAuctions, fetchMyWonAuctions, fetchMyLostAuctions,
 } from '@/lib/db';
 import { useCountdown } from '@/hooks/useCountdown';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
+import SkeletonCard from '@/components/shared/SkeletonCard';
 import BidModal from '@/components/buyer/BidModal';
 import AuctionDetail from '@/components/buyer/AuctionDetail';
 import SellerShop from '@/components/buyer/SellerShop';
-
-type HomeTab = 'live' | 'favorites' | 'selling' | 'ended';
 
 function hoursUntilEnd(endsAt: string) {
   return (new Date(endsAt).getTime() - Date.now()) / 3_600_000;
@@ -66,6 +67,9 @@ export default function UnifiedHome({
   const [ended, setEnded] = useState<Auction[]>([]);
   const [favorites, setFavorites] = useState<Auction[]>([]);
   const [mySales, setMySales] = useState<Auction[]>([]);
+  const [myActiveBids, setMyActiveBids] = useState<Auction[]>([]);
+  const [myWins, setMyWins] = useState<Auction[]>([]);
+  const [myLost, setMyLost] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [bidModal, setBidModal] = useState<Auction | null>(null);
   const [detailAuction, setDetailAuction] = useState<Auction | null>(null);
@@ -102,16 +106,22 @@ export default function UnifiedHome({
     setLoading(true);
     const itemSearch = searchMode === 'items' ? search : '';
     try {
-      const [liveData, endedData, favData, salesData] = await Promise.all([
+      const [liveData, endedData, favData, salesData, activeBids, wins, lost] = await Promise.all([
         fetchLiveAuctions(userId, itemSearch),
         fetchEndedAuctions(itemSearch),
         fetchFavorites(userId),
         fetchSellerAuctions(userId),
+        fetchMyActiveBidAuctions(userId),
+        fetchMyWonAuctions(userId),
+        fetchMyLostAuctions(userId),
       ]);
       setLive(liveData);
       setEnded(endedData);
       setFavorites(favData);
       setMySales(salesData);
+      setMyActiveBids(activeBids);
+      setMyWins(wins);
+      setMyLost(lost);
     } catch {
       setLive([]); setEnded([]); setFavorites([]); setMySales([]);
     } finally {
@@ -121,11 +131,7 @@ export default function UnifiedHome({
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (detailAuction || selectedSeller || showCreate) return;
-    const id = setInterval(() => { load(); }, 15000);
-    return () => clearInterval(id);
-  }, [load, detailAuction, selectedSeller, showCreate]);
+  useRealtimeRefresh(() => { load(); }, !detailAuction && !selectedSeller && !showCreate);
 
   useEffect(() => {
     fetchTopSellers(6).then(setTopSellers).catch(() => setTopSellers([]));
@@ -293,13 +299,20 @@ export default function UnifiedHome({
       <div className="header-dark px-5 pt-2 pb-0">
         <div className="flex items-center justify-between py-2">
           <h2 className="text-xs uppercase tracking-widest text-white/40 font-bold">
-            {{live:'Enchères en direct',favorites:'Mes favoris',selling:'Mes ventes',ended:'Terminées'}[tab]}
+            {{
+              live: 'Enchères en direct', favorites: 'Mes favoris', selling: 'Mes ventes', ended: 'Terminées',
+              mybids: 'Mes offres actives', mywins: 'Mes gains', mylost: 'Perdues',
+            }[tab]}
           </h2>
+          <button type="button" onClick={() => load()} className="text-[10px] text-accent font-bold">↻ Actualiser</button>
         </div>
-        <div className="tab-bar">
-          {(['live', 'favorites', 'selling', 'ended'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={tab === t ? 'active' : ''}>
-              {{live:'Live',favorites:'Favoris',selling:'Ventes',ended:'Finies'}[t]}
+        <div className="tab-bar overflow-x-auto flex-nowrap">
+          {(['live', 'favorites', 'mybids', 'mywins', 'mylost', 'selling', 'ended'] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)} className={`shrink-0 ${tab === t ? 'active' : ''}`}>
+              {{
+                live: 'Live', favorites: 'Favoris', selling: 'Ventes', ended: 'Finies',
+                mybids: 'Offres', mywins: 'Gains', mylost: 'Perdues',
+              }[t]}
             </button>
           ))}
         </div>
@@ -413,9 +426,9 @@ export default function UnifiedHome({
         ))}
 
         {!isSellerMode && loading && (
-          <div className="flex flex-col items-center gap-3 py-12">
-            <div className="ghost-logo-wrap w-10 h-10 rounded-xl flex items-center justify-center animate-ghost-float"><GhostLogo size={26} /></div>
-            <p className="text-text-3 text-sm">Chargement...</p>
+          <div className="space-y-3">
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         )}
 
@@ -497,6 +510,42 @@ export default function UnifiedHome({
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'mybids' && myActiveBids.length === 0 && (
+          <div className="ui-card p-10 text-center">
+            <p className="font-bold text-text">Aucune offre active</p>
+            <p className="text-text-3 text-sm mt-2">Enchéris sur une vente live</p>
+          </div>
+        )}
+
+        {!isSellerMode && !loading && tab === 'mybids' && myActiveBids.map((item) => (
+          <AuctionCard key={item.id} item={item} isOwner={item.seller_id === userId}
+            onPress={() => setDetailAuction(item)}
+            onBid={(cents) => handleBid(item, cents)}
+            onBuyNow={() => handleBuyNow(item)}
+            onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))}
+            onBidError={showBidError} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'mywins' && myWins.map((item) => (
+          <AuctionCard key={item.id} item={item} showEnded
+            onPress={() => setDetailAuction(item)}
+            onBid={async () => {}}
+            onCustomBid={() => setDetailAuction(item)}
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'mylost' && myLost.map((item) => (
+          <AuctionCard key={item.id} item={item} showEnded
+            onPress={() => setDetailAuction(item)}
+            onBid={async () => {}}
+            onCustomBid={() => setDetailAuction(item)}
             onFavorite={() => handleFavorite(item)}
             onSellerClick={() => openSeller(sellerFromAuction(item))} />
         ))}

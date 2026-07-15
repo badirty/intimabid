@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Flame, Heart, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, Flame, Heart, Clock, Zap, Flag, Trash2, Timer } from 'lucide-react';
 import type { Auction, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, isAuctionLive } from '@/lib/format';
-import { fetchAuctionById, fetchBidHistory } from '@/lib/db';
+import { cancelAuction, extendAuction, fetchAuctionById, fetchBidHistory } from '@/lib/db';
+import ReportModal from '@/components/shared/ReportModal';
 import { useCountdown } from '@/hooks/useCountdown';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -53,6 +54,8 @@ export default function AuctionDetail({
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [bidModal, setBidModal] = useState(false);
   const [favving, setFavving] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [ownerBusy, setOwnerBusy] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -161,6 +164,15 @@ export default function AuctionDetail({
             <p className="text-white/50 text-xs">@{currentItem.seller_name}</p>
           )}
         </div>
+        {!isOwner && (
+          <button
+            type="button"
+            onClick={() => setShowReport(true)}
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
+          >
+            <Flag className="w-4 h-4 text-white/70" />
+          </button>
+        )}
         <button
           onClick={handleFavorite}
           disabled={favving}
@@ -322,6 +334,38 @@ export default function AuctionDetail({
           </div>
         </div>
       )}
+
+      {isOwner && live && (
+        <div className="px-5 pb-4 flex gap-2">
+          <button
+            type="button"
+            disabled={ownerBusy}
+            onClick={async () => {
+              setOwnerBusy(true);
+              try { await extendAuction(currentItem.id, 1); await refresh(); } catch { /* toast parent */ }
+              finally { setOwnerBusy(false); }
+            }}
+            className="btn-ghost flex-1 py-2.5 text-xs flex items-center justify-center gap-1"
+          >
+            <Timer className="w-3.5 h-3.5" /> +1h
+          </button>
+          <button
+            type="button"
+            disabled={ownerBusy}
+            onClick={async () => {
+              if (!confirm('Annuler cette enchère ?')) return;
+              setOwnerBusy(true);
+              try { await cancelAuction(currentItem.id); onClose(); } catch { /* */ }
+              finally { setOwnerBusy(false); }
+            }}
+            className="flex-1 py-2.5 text-xs rounded-xl border border-rose/30 text-rose flex items-center justify-center gap-1"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Annuler
+          </button>
+        </div>
+      )}
+
+      {showReport && <ReportModal auctionId={currentItem.id} onClose={() => setShowReport(false)} />}
 
       {bidModal && (
         <BidModal
