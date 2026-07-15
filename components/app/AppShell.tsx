@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Tab } from '@/lib/types';
 import { getUnreadNotificationCount } from '@/lib/db';
-import BadirtyLogo from '@/components/brand/BadirtyLogo';
 import GhostLogo from '@/components/brand/GhostLogo';
 import BottomNav from '@/components/layout/BottomNav';
 import UnifiedHome from '@/components/app/UnifiedHome';
@@ -105,7 +104,12 @@ export default function AppShell({
             <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
               <GhostLogo size={22} />
             </div>
-            <BadirtyLogo size="header" className="h-7 w-auto" />
+            <span
+              className="text-sm font-extrabold tracking-wider text-white/90"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              badirty
+            </span>
           </div>
         </div>
       )}
