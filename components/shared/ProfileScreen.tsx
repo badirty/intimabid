@@ -244,10 +244,11 @@ export default function ProfileScreen({
         ))}
       </div>
 
-      <div className="flex justify-center gap-4 text-[11px] text-text-3 mb-4 flex-wrap">
+      <div className="flex justify-center gap-3 text-[11px] text-text-3 mb-4 flex-wrap">
         <a href="/contact" className="hover:text-accent transition-colors flex items-center gap-1"><Mail className="w-3 h-3" /> Contact</a>
-        <a href="/privacy" className="hover:text-accent transition-colors">Confidentialité</a>
+        <a href="/mentions-legales" className="hover:text-accent transition-colors">Mentions</a>
         <a href="/terms" className="hover:text-accent transition-colors">CGU</a>
+        <a href="/privacy" className="hover:text-accent transition-colors">Confidentialité</a>
       </div>
 
       <button

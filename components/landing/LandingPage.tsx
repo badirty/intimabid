@@ -144,9 +144,11 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
           </button>
           <p className="text-center text-[11px] text-text-3 mt-1">
             Paiements sécurisés ·{' '}
-            <a href="/privacy" className="text-accent hover:underline">Confidentialité</a>
+            <a href="/mentions-legales" className="text-accent hover:underline">Mentions</a>
             {' · '}
             <a href="/terms" className="text-accent hover:underline">CGU</a>
+            {' · '}
+            <a href="/privacy" className="text-accent hover:underline">Confidentialité</a>
           </p>
         </div>
       </div>
