@@ -55,7 +55,7 @@ export default function AuthPage({
     } else {
       const { error: e } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
       if (e) setError(e.message);
-      else setSuccess('Compte créé ! Vérifie ton e-mail pour confirmer.');
+      else setSuccess('Bienvenue sur badirty ! Un e-mail de confirmation vient d\'être envoyé — clique le lien violet pour activer ton compte.');
     }
     setLoading(null);
   };
