@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { LogOut, Wallet, Store, Pencil, Check, X, Package, Mail } from 'lucide-react';
 import { centsToEuros } from '@/lib/format';
-import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName } from '@/lib/db';
+import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName, updateProfileSettings } from '@/lib/db';
 import { resolveProfileFromUser } from '@/lib/profile';
 import type { SellerSearchResult } from '@/lib/types';
 import UserAvatar from '@/components/brand/UserAvatar';
@@ -28,9 +28,12 @@ export default function ProfileScreen({
   const oauth = resolveProfileFromUser(user);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(oauth.avatar_url);
+  const [bio, setBio] = useState('');
+  const [bioPublic, setBioPublic] = useState(false);
   const [stats, setStats] = useState({ bids_count: 0, sales_count: 0, balance_cents: 0 });
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
+  const [draftBio, setDraftBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,19 +44,23 @@ export default function ProfileScreen({
       if (p?.display_name) setProfileName(p.display_name);
       if (p?.avatar_url) setAvatarUrl(p.avatar_url);
       else if (oauth.avatar_url) setAvatarUrl(oauth.avatar_url);
+      setBio(p?.bio ?? oauth.bio ?? '');
+      setBioPublic(p?.bio_public ?? false);
     }).catch(() => {});
-  }, [userId, oauth.avatar_url]);
+  }, [userId, oauth.avatar_url, oauth.bio]);
 
   useEffect(() => {
     fetchUserStats(userId).then(setStats);
   }, [userId, walletVersion]);
 
-  const saveName = async () => {
+  const saveProfile = async () => {
     setSaving(true);
     setError(null);
     try {
       await updateDisplayName(userId, draftName);
+      await updateProfileSettings(userId, { bio: draftBio });
       setProfileName(draftName.trim());
+      setBio(draftBio.trim());
       setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -62,9 +69,19 @@ export default function ProfileScreen({
     }
   };
 
+  const toggleBioPublic = async () => {
+    const next = !bioPublic;
+    setBioPublic(next);
+    try {
+      await updateProfileSettings(userId, { bio_public: next });
+    } catch {
+      setBioPublic(!next);
+    }
+  };
+
   const openMyShop = async () => {
     if (!onOpenShop) return;
-    const seller = await fetchSellerStats(userId);
+    const seller = await fetchSellerStats(userId, userId);
     onOpenShop(seller);
   };
 
@@ -78,19 +95,30 @@ export default function ProfileScreen({
           className="mx-auto mb-4 ring-2 ring-accent/20"
         />
         {editing ? (
-          <div className="space-y-2">
+          <div className="space-y-2 text-left">
+            <label className="text-[10px] uppercase tracking-wider text-text-3 font-bold">Pseudo</label>
             <input
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               maxLength={32}
-              className="search-bar w-full px-4 py-2.5 text-sm text-center"
+              className="search-bar w-full px-4 py-2.5 text-sm"
               placeholder="Ton pseudo"
             />
+            <label className="text-[10px] uppercase tracking-wider text-text-3 font-bold">Bio</label>
+            <textarea
+              value={draftBio}
+              onChange={(e) => setDraftBio(e.target.value)}
+              maxLength={160}
+              rows={3}
+              className="search-bar w-full px-4 py-2.5 text-sm resize-none"
+              placeholder="Ta bio (importée depuis X ou Google si connecté)"
+            />
+            <p className="text-[10px] text-text-3">{draftBio.length}/160</p>
             {error && <p className="text-rose text-xs">{error}</p>}
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center pt-1">
               <button
                 type="button"
-                onClick={saveName}
+                onClick={saveProfile}
                 disabled={saving}
                 className="btn-accent px-4 py-2 text-xs flex items-center gap-1"
               >
@@ -113,17 +141,46 @@ export default function ProfileScreen({
               </h2>
               <button
                 type="button"
-                onClick={() => { setDraftName(displayName); setEditing(true); }}
+                onClick={() => {
+                  setDraftName(displayName);
+                  setDraftBio(bio);
+                  setEditing(true);
+                }}
                 className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-3 hover:text-accent"
-                aria-label="Modifier le pseudo"
+                aria-label="Modifier le profil"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-text-2 text-sm mt-1">{user.email}</p>
+            {bio ? (
+              <p className="text-text-2 text-sm mt-3 leading-relaxed whitespace-pre-wrap">{bio}</p>
+            ) : (
+              <p className="text-text-3 text-sm mt-3">Ajoute une bio pour personnaliser ton profil</p>
+            )}
           </>
         )}
       </div>
+
+      {!editing && (
+        <button
+          type="button"
+          onClick={toggleBioPublic}
+          className="ui-card w-full p-4 mb-4 flex items-center justify-between gap-3 text-left"
+        >
+          <div>
+            <p className="font-bold text-sm">Bio visible sur ma boutique</p>
+            <p className="text-text-3 text-xs mt-0.5">Les autres voient ton pseudo{bio ? ' et ta bio' : ''} — jamais ton e-mail</p>
+          </div>
+          <div
+            className={`w-11 h-6 rounded-full shrink-0 transition-colors ${bioPublic ? 'bg-accent' : 'bg-white/10'}`}
+            aria-hidden
+          >
+            <div
+              className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${bioPublic ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+            />
+          </div>
+        </button>
+      )}
 
       <button
         type="button"

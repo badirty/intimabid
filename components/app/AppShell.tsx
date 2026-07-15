@@ -38,8 +38,8 @@ export default function AppShell({
 
   useEffect(() => {
     if (!initialSellerId) return;
-    fetchProfileById(initialSellerId).then((s) => { if (s) setDeepLinkSeller(s); });
-  }, [initialSellerId]);
+    fetchProfileById(initialSellerId, user.id).then((s) => { if (s) setDeepLinkSeller(s); });
+  }, [initialSellerId, user.id]);
 
   const refreshNotifs = useCallback(async () => {
     setNotifCount(await getUnreadNotificationCount(user.id));

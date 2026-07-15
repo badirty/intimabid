@@ -55,6 +55,8 @@ export interface Profile {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  bio?: string | null;
+  bio_public?: boolean;
   created_at?: string;
 }
 
@@ -64,6 +66,7 @@ export interface SellerSearchResult {
   live_count: number;
   total_sales: number;
   avatar_url?: string | null;
+  bio?: string | null;
 }
 
 export interface Order {

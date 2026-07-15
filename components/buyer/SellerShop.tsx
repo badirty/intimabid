@@ -63,6 +63,9 @@ export default function SellerShop({
               {seller.live_count} enchère{seller.live_count !== 1 ? 's' : ''} live
               {seller.total_sales > 0 && ` · ${seller.total_sales} vente${seller.total_sales !== 1 ? 's' : ''}`}
             </p>
+            {seller.bio && (
+              <p className="text-text-2 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{seller.bio}</p>
+            )}
           </div>
         </div>
 

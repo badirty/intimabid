@@ -62,7 +62,9 @@ declare
   v_a public.auctions%rowtype;
 begin
   select * into v_a from public.auctions where id = p_auction_id;
-  if not found or v_a.status != 'sold' or v_a.winner_id is null then return end if;
+  if not found or v_a.status != 'sold' or v_a.winner_id is null then
+    return;
+  end if;
   insert into public.orders (auction_id, buyer_id, seller_id, amount_cents, status)
   values (v_a.id, v_a.winner_id, v_a.seller_id, v_a.current_price_cents, 'pending_address')
   on conflict (auction_id) do nothing;
