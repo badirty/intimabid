@@ -404,9 +404,38 @@ export async function creditWallet(userId: string, amountCents: number, type: 't
   });
 }
 
+async function authFetch(path: string, init?: RequestInit) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string>),
+  };
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  return fetch(path, { ...init, headers });
+}
+
+/** Retrait automatique vers compte bancaire (Stripe Connect). */
+export async function withdrawToBank(amountCents: number): Promise<{ message?: string }> {
+  const res = await authFetch('/api/stripe/withdraw', {
+    method: 'POST',
+    body: JSON.stringify({ amount_cents: amountCents }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? 'Erreur retrait');
+  return data;
+}
+
+/** Annule un retrait bloqué en « en attente » et recrédite le portefeuille. */
+export async function cancelPendingWithdrawal(): Promise<number> {
+  const res = await authFetch('/api/stripe/withdraw/cancel', { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? 'Erreur annulation');
+  return data.cancelled_cents ?? 0;
+}
+
+/** @deprecated Utiliser withdrawToBank */
 export async function requestWithdrawal(amountCents: number) {
-  const { error } = await supabase.rpc('request_withdrawal', { p_amount_cents: amountCents });
-  if (error) throw new Error(error.message);
+  await withdrawToBank(amountCents);
 }
 
 export async function fetchNotifications(userId: string): Promise<Notification[]> {

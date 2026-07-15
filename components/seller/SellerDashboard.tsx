@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Shirt, Camera, X } from 'lucide-react';
 import { centsToEuros, eurosToCents, IMAGE_COLORS } from '@/lib/format';
-import { createAuction, fetchSellerAuctions, fetchWallet, requestWithdrawal, uploadAuctionImage } from '@/lib/db';
+import { createAuction, fetchSellerAuctions, fetchWallet, withdrawToBank, uploadAuctionImage } from '@/lib/db';
 
 const DURATIONS: Record<string, number> = { '3j': 3, '5j': 5, '7j': 7 };
 
@@ -77,10 +77,10 @@ export default function SellerDashboard({
   };
 
   const withdraw = async () => {
-    if (balanceCents < 1000) { setError('Minimum 10 € pour retirer'); return; }
+    if (balanceCents < 100) { setError('Minimum 1 € pour retirer'); return; }
     try {
-      await requestWithdrawal(balanceCents);
-      setToast('Demande de retrait envoyée');
+      const data = await withdrawToBank(balanceCents);
+      setToast(data.message ?? 'Virement envoyé');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');

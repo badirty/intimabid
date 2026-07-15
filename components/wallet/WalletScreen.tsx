@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CreditCard, Sparkles } from 'lucide-react';
 import { centsToEuros, eurosToCents } from '@/lib/format';
-import { demoTopup, fetchWallet, fetchWalletTransactions, isDbReady, requestWithdrawal } from '@/lib/db';
+import {
+  cancelPendingWithdrawal,
+  demoTopup,
+  fetchWallet,
+  fetchWalletTransactions,
+  isDbReady,
+  withdrawToBank,
+} from '@/lib/db';
 import type { WalletTransaction } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -58,6 +65,7 @@ export default function WalletScreen({
   const [busy, setBusy] = useState(false);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [withdrawEuros, setWithdrawEuros] = useState(10);
+  const [connectReady, setConnectReady] = useState<boolean | null>(null);
   const paymentHandled = useRef(false);
 
   const stripeEnabled = !!config?.stripe;
@@ -94,6 +102,14 @@ export default function WalletScreen({
   }, []);
 
   useEffect(() => {
+    if (!stripeEnabled) return;
+    fetch('/api/stripe/connect/status', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setConnectReady(!!d.payouts_enabled))
+      .catch(() => setConnectReady(false));
+  }, [stripeEnabled]);
+
+  useEffect(() => {
     if (paymentHandled.current) return;
     const params = new URLSearchParams(window.location.search);
     const walletStatus = params.get('wallet');
@@ -104,6 +120,15 @@ export default function WalletScreen({
 
     if (walletStatus === 'cancel') {
       setError('Paiement annulé');
+      return;
+    }
+
+    if (walletStatus === 'connect_done' || walletStatus === 'connect_refresh') {
+      setMsg('Stripe Connect mis à jour');
+      fetch('/api/stripe/connect/status', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d) => setConnectReady(!!d.payouts_enabled))
+        .catch(() => setConnectReady(false));
       return;
     }
 
@@ -250,7 +275,32 @@ export default function WalletScreen({
           {displayBalance} €
         </p>
         {pendingCents > 0 && (
-          <p className="text-amber-600 text-sm mt-2">{centsToEuros(pendingCents)} € en attente</p>
+          <div className="mt-3 space-y-2">
+            <p className="text-amber-400 text-sm">{centsToEuros(pendingCents)} € en cours de virement</p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  const cancelled = await cancelPendingWithdrawal();
+                  if (cancelled > 0) {
+                    setMsg('Retrait annulé — montant recrédité sur ton portefeuille');
+                  }
+                  await load();
+                  onBalanceChange?.();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Erreur');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="text-xs text-rose hover:underline disabled:opacity-50"
+            >
+              Annuler le retrait en attente
+            </button>
+          </div>
         )}
       </div>
 
@@ -361,37 +411,54 @@ export default function WalletScreen({
 
       <div className="ui-card p-5 mb-3">
         <h2 className="font-bold text-sm mb-3">Retirer (vendeur)</h2>
-        <p className="text-text-3 text-xs mb-3">Demande un virement ou configure Stripe Connect.</p>
+        <p className="text-text-3 text-xs mb-3">
+          Virement automatique vers ton compte bancaire via Stripe Connect (1–3 jours ouvrés).
+        </p>
+        {connectReady === false && (
+          <p className="text-amber-200/90 text-xs mb-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+            Configure Stripe Connect ci-dessous avant ton premier retrait.
+          </p>
+        )}
+        {connectReady === true && (
+          <p className="text-seller text-xs mb-3">✓ Compte bancaire connecté</p>
+        )}
         <div className="flex gap-2 mb-3">
           <input
             type="number"
             min={1}
             max={500}
+            step={0.5}
             value={withdrawEuros}
             onChange={(e) => setWithdrawEuros(parseFloat(e.target.value) || 0)}
-            className="search-bar flex-1 px-3 py-2.5 text-sm"
+            disabled={busy || pendingCents > 0}
+            className="search-bar flex-1 px-3 py-2.5 text-sm disabled:opacity-50"
           />
           <span className="text-text-3 text-sm self-center">€</span>
         </div>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || pendingCents > 0 || !connectReady}
           onClick={async () => {
             setBusy(true);
             setError(null);
+            setMsg(null);
             try {
-              await requestWithdrawal(Math.round(withdrawEuros * 100));
-              setMsg('Demande de retrait enregistrée');
+              const amount = Math.round(withdrawEuros * 100);
+              if (amount < 100) throw new Error('Minimum 1 €');
+              if (amount > balanceCents) throw new Error('Solde insuffisant');
+              const data = await withdrawToBank(amount);
+              setMsg(data.message ?? 'Virement envoyé');
               await load();
+              onBalanceChange?.();
             } catch (e) {
               setError(e instanceof Error ? e.message : 'Erreur');
             } finally {
               setBusy(false);
             }
           }}
-          className="btn-ghost w-full py-2.5 text-xs mb-2"
+          className="btn-ghost w-full py-2.5 text-xs mb-2 disabled:opacity-50"
         >
-          Demander un retrait
+          {busy ? 'Virement en cours…' : 'Retirer vers mon compte'}
         </button>
         <button
           type="button"
