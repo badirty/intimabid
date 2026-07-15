@@ -1,10 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Bell, Flame, TrendingDown, Zap } from 'lucide-react';
 import type { Notification } from '@/lib/types';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/db';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+function notifIcon(type: string) {
+  if (type === 'outbid') return <TrendingDown className="w-4 h-4 text-rose" />;
+  if (type === 'bid') return <Flame className="w-4 h-4 text-accent" />;
+  if (type === 'sale' || type === 'sold') return <Zap className="w-4 h-4 text-pink" />;
+  return <Bell className="w-4 h-4 text-text-3" />;
+}
 
 export default function NotificationsScreen({
   userId,
@@ -66,15 +74,22 @@ export default function NotificationsScreen({
               !n.read ? 'ring-2 ring-buyer/20' : ''
             }`}
           >
-            <div className="flex justify-between gap-2">
-              <p className="font-bold text-sm text-text">{n.title}</p>
-              {!n.read && <span className="w-2 h-2 rounded-full bg-buyer shrink-0 mt-1.5" />}
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center shrink-0 mt-0.5">
+                {notifIcon(n.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between gap-2">
+                  <p className="font-bold text-sm text-text">{n.title}</p>
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-buyer shrink-0 mt-1.5" />}
+                </div>
+                {n.body && <p className="text-text-2 text-xs mt-1">{n.body}</p>}
+                <p className="text-text-3 text-[10px] mt-2">
+                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })}
+                  {n.auction_id ? ' · Voir l\'enchère →' : ''}
+                </p>
+              </div>
             </div>
-            {n.body && <p className="text-text-2 text-xs mt-1">{n.body}</p>}
-            <p className="text-text-3 text-[10px] mt-2">
-              {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })}
-              {n.auction_id && ' · Voir l\'enchère →'}
-            </p>
           </button>
         ))}
       </div>

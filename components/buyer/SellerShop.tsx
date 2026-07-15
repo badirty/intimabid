@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Store } from 'lucide-react';
 import type { Auction, SellerSearchResult } from '@/lib/types';
 import { fetchLiveAuctionsBySeller } from '@/lib/db';
-import GhostLogo from '@/components/brand/GhostLogo';
+import UserAvatar from '@/components/brand/UserAvatar';
 
 export default function SellerShop({
   seller,
@@ -56,9 +56,7 @@ export default function SellerShop({
 
       <div className="px-4 py-4 space-y-4">
         <div className="ui-card p-4 flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-accent/15 flex items-center justify-center shrink-0">
-            <GhostLogo size={32} />
-          </div>
+          <UserAvatar src={seller.avatar_url} name={seller.display_name} size={56} rounded="rounded-2xl" />
           <div>
             <p className="font-bold text-text">@{seller.display_name}</p>
             <p className="text-text-3 text-sm mt-0.5">

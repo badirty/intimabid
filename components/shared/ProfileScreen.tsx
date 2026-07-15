@@ -1,58 +1,133 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LogOut, Wallet, Sparkles } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
+import { LogOut, Wallet, Store, Pencil, Check, X } from 'lucide-react';
 import { centsToEuros } from '@/lib/format';
-import { fetchUserStats } from '@/lib/db';
-import GhostLogo from '@/components/brand/GhostLogo';
+import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName } from '@/lib/db';
+import { resolveProfileFromUser } from '@/lib/profile';
+import type { SellerSearchResult } from '@/lib/types';
+import UserAvatar from '@/components/brand/UserAvatar';
 
 export default function ProfileScreen({
-  userId,
-  email,
-  appMode,
-  preferredMode,
+  user,
   onSignOut,
-  onModeChange,
-  onPreferredModeChange,
   onWallet,
+  onOpenShop,
   walletVersion = 0,
 }: {
-  userId: string;
-  email?: string;
-  appMode?: string;
-  preferredMode?: string;
+  user: User;
   onSignOut: () => void;
-  onModeChange?: (m: string) => void;
-  onPreferredModeChange?: (m: string) => void;
   onWallet?: () => void;
+  onOpenShop?: (seller: SellerSearchResult) => void;
   walletVersion?: number;
 }) {
-  const name = email?.split('@')[0] ?? 'user';
+  const userId = user.id;
+  const oauth = resolveProfileFromUser(user);
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(oauth.avatar_url);
   const [stats, setStats] = useState({ bids_count: 0, sales_count: 0, balance_cents: 0 });
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const displayName = profileName ?? oauth.display_name;
+
+  useEffect(() => {
+    fetchProfile(userId).then((p) => {
+      if (p?.display_name) setProfileName(p.display_name);
+      if (p?.avatar_url) setAvatarUrl(p.avatar_url);
+      else if (oauth.avatar_url) setAvatarUrl(oauth.avatar_url);
+    }).catch(() => {});
+  }, [userId, oauth.avatar_url]);
 
   useEffect(() => {
     fetchUserStats(userId).then(setStats);
   }, [userId, walletVersion]);
 
+  const saveName = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateDisplayName(userId, draftName);
+      setProfileName(draftName.trim());
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openMyShop = async () => {
+    if (!onOpenShop) return;
+    const seller = await fetchSellerStats(userId);
+    onOpenShop(seller);
+  };
+
   return (
     <div className="animate-slide-up px-4 py-6">
-      {/* Profile card */}
       <div className="ui-card p-6 text-center mb-4">
-        <div className="ghost-logo-wrap w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <GhostLogo size={48} />
-        </div>
-        <h2 className="font-extrabold text-xl" style={{ fontFamily: 'var(--font-display)' }}>
-          @{name}
-        </h2>
-        <p className="text-text-2 text-sm mt-1">{email}</p>
+        <UserAvatar
+          src={avatarUrl}
+          name={displayName}
+          size={80}
+          className="mx-auto mb-4 ring-2 ring-accent/20"
+        />
+        {editing ? (
+          <div className="space-y-2">
+            <input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              maxLength={32}
+              className="search-bar w-full px-4 py-2.5 text-sm text-center"
+              placeholder="Ton pseudo"
+            />
+            {error && <p className="text-rose text-xs">{error}</p>}
+            <div className="flex gap-2 justify-center">
+              <button
+                type="button"
+                onClick={saveName}
+                disabled={saving}
+                className="btn-accent px-4 py-2 text-xs flex items-center gap-1"
+              >
+                <Check className="w-3.5 h-3.5" /> {saving ? '...' : 'OK'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditing(false); setError(null); }}
+                className="btn-ghost px-4 py-2 text-xs flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" /> Annuler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-center gap-2">
+              <h2 className="font-extrabold text-xl" style={{ fontFamily: 'var(--font-display)' }}>
+                @{displayName}
+              </h2>
+              <button
+                type="button"
+                onClick={() => { setDraftName(displayName); setEditing(true); }}
+                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-3 hover:text-accent"
+                aria-label="Modifier le pseudo"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="text-text-2 text-sm mt-1">{user.email}</p>
+          </>
+        )}
       </div>
 
-      {/* Wallet button */}
       <button
         type="button"
         onClick={() => onWallet?.()}
         disabled={!onWallet}
-        className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:border-accent/30 transition-all disabled:opacity-50"
+        className="ui-card w-full p-4 mb-3 flex items-center gap-3 hover:border-accent/30 transition-all disabled:opacity-50"
       >
         <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
           <Wallet className="w-5 h-5 text-accent" />
@@ -64,12 +139,27 @@ export default function ProfileScreen({
         <span className="text-text-3">→</span>
       </button>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      {onOpenShop && (
+        <button
+          type="button"
+          onClick={openMyShop}
+          className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:border-accent/30 transition-all"
+        >
+          <div className="w-10 h-10 rounded-xl bg-pink/10 flex items-center justify-center">
+            <Store className="w-5 h-5 text-pink" />
+          </div>
+          <div className="text-left flex-1">
+            <p className="font-bold text-sm">Ma boutique</p>
+            <p className="text-text-3 text-xs mt-0.5">Voir mes enchères en ligne</p>
+          </div>
+          <span className="text-text-3">→</span>
+        </button>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
         {[
-          { v: stats.bids_count, l: 'Enchères', color: 'text-accent' },
-          { v: stats.sales_count, l: 'Ventes', color: 'text-pink' },
-          { v: `${centsToEuros(stats.balance_cents)}€`, l: 'Solde', color: 'text-text' },
+          { v: stats.bids_count, l: 'Offres placées', color: 'text-accent' },
+          { v: stats.sales_count, l: 'Ventes lancées', color: 'text-pink' },
         ].map((s) => (
           <div key={s.l} className="ui-card p-3 text-center">
             <p className={`font-extrabold text-lg ${s.color}`}>{s.v}</p>
@@ -78,7 +168,11 @@ export default function ProfileScreen({
         ))}
       </div>
 
-      {/* Logout */}
+      <div className="flex justify-center gap-4 text-[11px] text-text-3 mb-4">
+        <a href="/privacy" className="hover:text-accent transition-colors">Confidentialité</a>
+        <a href="/terms" className="hover:text-accent transition-colors">CGU</a>
+      </div>
+
       <button
         onClick={onSignOut}
         className="w-full py-3 rounded-xl border border-rose/30 text-rose font-semibold text-sm flex items-center justify-center gap-2 hover:bg-rose/5 transition-colors"

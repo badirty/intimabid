@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CreditCard, Sparkles } from 'lucide-react';
 import { centsToEuros, eurosToCents } from '@/lib/format';
-import { demoTopup, fetchWallet, isDbReady } from '@/lib/db';
+import { demoTopup, fetchWallet, fetchWalletTransactions, isDbReady } from '@/lib/db';
+import type { WalletTransaction } from '@/lib/types';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import GhostLogo from '@/components/brand/GhostLogo';
 
@@ -53,6 +56,7 @@ export default function WalletScreen({
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [dbReady, setDbReady] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const paymentHandled = useRef(false);
 
   const stripeEnabled = !!config?.stripe;
@@ -77,6 +81,10 @@ export default function WalletScreen({
   }, [userId]);
 
   useEffect(() => { load({ initial: true }); }, [load]);
+
+  useEffect(() => {
+    fetchWalletTransactions(userId).then(setTransactions).catch(() => setTransactions([]));
+  }, [userId, balanceCents]);
 
   useEffect(() => {
     fetchAppConfig()
@@ -246,9 +254,9 @@ export default function WalletScreen({
       </div>
 
       {!dbReady && (
-        <div className="ui-card p-4 mb-4 border-amber-200 bg-amber-50/80">
-          <p className="text-amber-800 text-sm font-semibold">Base de données à configurer</p>
-          <p className="text-amber-700 text-xs mt-1">Exécute les migrations SQL dans Supabase.</p>
+        <div className="ui-card p-4 mb-4 border-amber-500/30 bg-amber-500/10">
+          <p className="text-amber-200 text-sm font-semibold">Base de données à configurer</p>
+          <p className="text-amber-200/70 text-xs mt-1">Exécute les migrations SQL dans Supabase.</p>
         </div>
       )}
 
@@ -262,11 +270,11 @@ export default function WalletScreen({
         )}
 
         {!configLoading && !canRecharge && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 space-y-2">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-100 space-y-2">
             <p className="font-semibold">Paiement indisponible</p>
             <p>Stripe n’est pas configuré sur Vercel.</p>
             {config?.stripeMissing?.length ? (
-              <p className="text-xs font-mono bg-amber-100/80 rounded-lg px-2 py-1.5">
+              <p className="text-xs font-mono bg-amber-500/15 rounded-lg px-2 py-1.5">
                 Manquant : {config.stripeMissing.join(', ')}
               </p>
             ) : null}
@@ -350,10 +358,31 @@ export default function WalletScreen({
         )}
       </div>
 
+      {transactions.length > 0 && (
+        <div className="ui-card p-4 mb-3">
+          <h2 className="font-bold text-sm mb-3">Historique</h2>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {transactions.map((tx) => (
+              <div key={tx.id} className="flex justify-between items-start gap-2 text-sm py-1.5 border-b border-white/5 last:border-0">
+                <div className="min-w-0">
+                  <p className="font-semibold text-text truncate">{tx.description ?? tx.type}</p>
+                  <p className="text-[10px] text-text-3">
+                    {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true, locale: fr })}
+                  </p>
+                </div>
+                <p className={`font-bold tabular-nums shrink-0 ${tx.amount_cents >= 0 ? 'text-seller' : 'text-rose'}`}>
+                  {tx.amount_cents >= 0 ? '+' : ''}{centsToEuros(tx.amount_cents)} €
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="min-h-[3rem] flex flex-col items-center justify-center gap-1 px-2">
         {msg && <p className="text-center text-sm text-seller font-semibold">{msg}</p>}
         {error && (
-          <p className="text-center text-sm text-red-600 font-semibold bg-red-50 border border-red-200 rounded-xl px-3 py-2 w-full">
+          <p className="text-center text-sm text-rose font-semibold bg-rose/10 border border-rose/25 rounded-xl px-3 py-2 w-full">
             {error}
           </p>
         )}

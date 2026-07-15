@@ -1,11 +1,22 @@
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
-import type { Auction, Notification, SellerSearchResult, UserStats, Wallet } from '@/lib/types';
+import { resolveProfileFromUser } from '@/lib/profile';
+import type { Auction, Notification, Profile, SellerSearchResult, UserStats, Wallet, WalletTransaction } from '@/lib/types';
 import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
-export async function ensureUserBootstrap(userId: string, email?: string) {
-  const name = email?.split('@')[0] ?? 'user';
-  await supabase.from('profiles').upsert({ id: userId, display_name: name }, { onConflict: 'id' });
+export async function ensureUserBootstrap(userId: string, email?: string, user?: User | null) {
+  const resolved = user ? resolveProfileFromUser(user) : { display_name: email?.split('@')[0] ?? 'user', avatar_url: null as string | null };
+  const { data: existing } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', userId).maybeSingle();
+
+  await supabase.from('profiles').upsert(
+    {
+      id: userId,
+      display_name: existing?.display_name ?? resolved.display_name,
+      avatar_url: resolved.avatar_url ?? existing?.avatar_url ?? null,
+    },
+    { onConflict: 'id' },
+  );
   const { data: w } = await supabase.from('wallets').select('user_id').eq('user_id', userId).maybeSingle();
   if (!w) {
     await supabase.from('wallets').insert({ user_id: userId, balance_cents: signupBonusCents() });
@@ -61,7 +72,7 @@ export async function searchSellers(query: string): Promise<SellerSearchResult[]
 
   const { data: profiles, error } = await supabase
     .from('profiles')
-    .select('id, display_name')
+    .select('id, display_name, avatar_url')
     .ilike('display_name', `%${q}%`)
     .limit(20);
 
@@ -90,6 +101,7 @@ export async function searchSellers(query: string): Promise<SellerSearchResult[]
       display_name: p.display_name ?? 'Vendeur',
       live_count: liveCount[p.id] ?? 0,
       total_sales: salesCount[p.id] ?? 0,
+      avatar_url: (p as { avatar_url?: string | null }).avatar_url ?? null,
     }))
     .sort((a, b) => b.live_count - a.live_count || a.display_name.localeCompare(b.display_name));
 }
@@ -133,9 +145,13 @@ async function enrichAuctions(rows: Record<string, unknown>[], userId?: string):
   const sellerIds = [...new Set(rows.map((r) => r.seller_id as string))];
   const sellerNames: Record<string, string> = {};
 
+  const sellerAvatars: Record<string, string | null> = {};
   if (sellerIds.length) {
-    const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', sellerIds);
-    for (const p of profiles ?? []) sellerNames[p.id] = p.display_name ?? 'Vendeur';
+    const { data: profiles } = await supabase.from('profiles').select('id, display_name, avatar_url').in('id', sellerIds);
+    for (const p of profiles ?? []) {
+      sellerNames[p.id] = p.display_name ?? 'Vendeur';
+      sellerAvatars[p.id] = p.avatar_url ?? null;
+    }
   }
 
   let favSet = new Set<string>();
@@ -153,6 +169,7 @@ async function enrichAuctions(rows: Record<string, unknown>[], userId?: string):
 
   return rows.map((r) => ({
     ...mapAuctionRow(r, sellerNames[r.seller_id as string]),
+    seller_avatar_url: sellerAvatars[r.seller_id as string] ?? null,
     is_favorite: favSet.has(r.id as string),
     bid_count: bidCounts[r.id as string] ?? 0,
   }));
@@ -225,7 +242,7 @@ export async function fetchTopSellers(limit = 6): Promise<SellerSearchResult[]> 
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name')
+    .select('id, display_name, avatar_url')
     .in('id', ids);
 
   return (profiles ?? [])
@@ -234,6 +251,7 @@ export async function fetchTopSellers(limit = 6): Promise<SellerSearchResult[]> 
       display_name: p.display_name ?? 'Vendeur',
       live_count: liveCount[p.id] ?? 0,
       total_sales: salesCount[p.id] ?? 0,
+      avatar_url: p.avatar_url ?? null,
     }))
     .sort((a, b) => b.live_count - a.live_count);
 }
@@ -306,15 +324,7 @@ export async function fetchSellerAuctions(sellerId: string) {
     throw error;
   }
 
-  const rows = data ?? [];
-  const ids = rows.map((r) => r.id);
-  const bidCounts: Record<string, number> = {};
-  if (ids.length) {
-    const { data: bids } = await supabase.from('bids').select('auction_id').in('auction_id', ids);
-    for (const b of bids ?? []) bidCounts[b.auction_id] = (bidCounts[b.auction_id] ?? 0) + 1;
-  }
-
-  return rows.map((r) => ({ ...r, bid_count: bidCounts[r.id] ?? 0 }));
+  return enrichAuctions((data ?? []) as Record<string, unknown>[], sellerId);
 }
 
 export async function fetchWallet(userId: string): Promise<Wallet | null> {
@@ -438,7 +448,7 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
   return count ?? 0;
 }
 
-export async function fetchAuctionById(auctionId: string): Promise<Auction | null> {
+export async function fetchAuctionById(auctionId: string, userId?: string): Promise<Auction | null> {
   const { data, error } = await supabase
     .from('auctions')
     .select('*')
@@ -446,13 +456,84 @@ export async function fetchAuctionById(auctionId: string): Promise<Auction | nul
     .maybeSingle();
 
   if (error || !data) return null;
-  return mapAuctionRow(data as Record<string, unknown>);
+  const [enriched] = await enrichAuctions([data as Record<string, unknown>], userId);
+  return enriched ?? null;
 }
 
-export async function fetchBidHistory(auctionId: string): Promise<{ bidder_name: string; amount_cents: number; created_at: string }[]> {
+export async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, created_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '42P01') return null;
+    throw error;
+  }
+  return data;
+}
+
+export async function updateDisplayName(userId: string, displayName: string) {
+  const name = displayName.trim();
+  if (!name || name.length < 2) throw new Error('Pseudo minimum 2 caractères');
+  if (name.length > 32) throw new Error('Pseudo maximum 32 caractères');
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, display_name: name }, { onConflict: 'id' });
+
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchWalletTransactions(userId: string, limit = 30): Promise<WalletTransaction[]> {
+  const { data, error } = await supabase
+    .from('wallet_transactions')
+    .select('id, type, amount_cents, description, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+  return data ?? [];
+}
+
+export async function fetchSellerStats(userId: string) {
+  const { data: auctions } = await supabase
+    .from('auctions')
+    .select('status')
+    .eq('seller_id', userId);
+
+  let live_count = 0;
+  let total_sales = 0;
+  for (const a of auctions ?? []) {
+    if (a.status === 'live') live_count++;
+    if (a.status === 'sold') total_sales++;
+  }
+
+  const profile = await fetchProfile(userId);
+  return {
+    id: userId,
+    display_name: profile?.display_name ?? 'Vendeur',
+    avatar_url: profile?.avatar_url ?? null,
+    live_count,
+    total_sales,
+  } satisfies SellerSearchResult;
+}
+
+export async function fetchBidHistory(auctionId: string): Promise<{
+  bidder_id: string;
+  bidder_name: string;
+  bidder_avatar_url: string | null;
+  amount_cents: number;
+  created_at: string;
+}[]> {
   const { data, error } = await supabase
     .from('bids')
-    .select('amount_cents, created_at, bidder_id, profiles(display_name)')
+    .select('amount_cents, created_at, bidder_id, profiles(display_name, avatar_url)')
     .eq('auction_id', auctionId)
     .order('created_at', { ascending: false })
     .limit(30);
@@ -462,11 +543,16 @@ export async function fetchBidHistory(auctionId: string): Promise<{ bidder_name:
     throw error;
   }
 
-  return (data ?? []).map((b: Record<string, unknown>) => ({
-    bidder_name: ((b.profiles as Record<string, unknown> | null)?.display_name as string) ?? 'Anonyme',
-    amount_cents: b.amount_cents as number,
-    created_at: b.created_at as string,
-  }));
+  return (data ?? []).map((b: Record<string, unknown>) => {
+    const profile = b.profiles as Record<string, unknown> | null;
+    return {
+      bidder_id: b.bidder_id as string,
+      bidder_name: (profile?.display_name as string) ?? 'Anonyme',
+      bidder_avatar_url: (profile?.avatar_url as string | null) ?? null,
+      amount_cents: b.amount_cents as number,
+      created_at: b.created_at as string,
+    };
+  });
 }
 
 export { eurosToCents };

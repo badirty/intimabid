@@ -23,7 +23,7 @@ export default function Home() {
     setUser(sessionUser);
     if (sessionUser) {
       setOnboarded(hasCompletedOnboarding(sessionUser));
-      ensureUserBootstrap(sessionUser.id, sessionUser.email).catch(() => {});
+      ensureUserBootstrap(sessionUser.id, sessionUser.email, sessionUser).catch(() => {});
     } else {
       setOnboarded(false);
     }

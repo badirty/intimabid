@@ -78,7 +78,7 @@ export default function OnboardingWelcome({
         </div>
 
         {error && <p className="text-red-500 text-sm text-center mt-4">{error}</p>}
-        <p className="text-center text-[11px] text-text-3 mt-6">Modifiable dans Profil →</p>
+        <p className="text-center text-[11px] text-text-3 mt-6">Tu pourras acheter et vendre dans les deux cas.</p>
       </div>
     </div>
     </div>

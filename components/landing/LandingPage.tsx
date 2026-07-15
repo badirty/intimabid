@@ -8,10 +8,10 @@ import { fetchLiveAuctions } from '@/lib/db';
 import { centsToEuros } from '@/lib/format';
 import { useCountdown } from '@/hooks/useCountdown';
 
-function TeaserCard({ item }: { item: Auction }) {
+function TeaserCard({ item, onTap }: { item: Auction; onTap: () => void }) {
   const countdown = useCountdown(item.ends_at);
   return (
-    <div className="teaser-card ui-card overflow-hidden">
+    <button type="button" onClick={onTap} className="teaser-card ui-card overflow-hidden text-left w-full">
       <div className={`relative h-36 bg-gradient-to-br ${item.image_color}`}>
         {item.image_url && (
           <img src={item.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -28,7 +28,7 @@ function TeaserCard({ item }: { item: Auction }) {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -72,7 +72,7 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
             </p>
             <div className="teaser-scroll flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
               {livePreview.map((item) => (
-                <TeaserCard key={item.id} item={item} />
+                <TeaserCard key={item.id} item={item} onTap={() => onNavigate('signup')} />
               ))}
             </div>
             <p className="text-text-3 text-[11px] text-center mt-3">
@@ -110,7 +110,7 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
             <div className="flex-1 min-w-0">
               <h3 className="font-extrabold text-text mb-0.5">Enchéris</h3>
               <p className="text-sm text-text-2 leading-relaxed">
-                Parcours les enchères en live, enchéris de façon anonyme et remporte des items exclusifs.
+                Parcours les enchères en live, enchéris sous ton pseudo et remporte des items exclusifs.
               </p>
             </div>
           </div>
@@ -143,7 +143,10 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
             J&apos;ai déjà un compte
           </button>
           <p className="text-center text-[11px] text-text-3 mt-1">
-            Paiements sécurisés · 100% anonyme
+            Paiements sécurisés ·{' '}
+            <a href="/privacy" className="text-accent hover:underline">Confidentialité</a>
+            {' · '}
+            <a href="/terms" className="text-accent hover:underline">CGU</a>
           </p>
         </div>
       </div>

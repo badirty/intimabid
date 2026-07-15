@@ -20,6 +20,7 @@ export interface Auction {
   winner_id: string | null;
   created_at: string;
   seller_name?: string;
+  seller_avatar_url?: string | null;
   bid_count?: number;
   is_favorite?: boolean;
 }
@@ -46,11 +47,27 @@ export interface UserStats {
   balance_cents: number;
 }
 
+export interface Profile {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at?: string;
+}
+
 export interface SellerSearchResult {
   id: string;
   display_name: string;
   live_count: number;
   total_sales: number;
+  avatar_url?: string | null;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: string;
+  amount_cents: number;
+  description: string | null;
+  created_at: string;
 }
 
 /** @deprecated use Auction */

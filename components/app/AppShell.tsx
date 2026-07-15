@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import type { Tab } from '@/lib/types';
-import { getUnreadNotificationCount } from '@/lib/db';
+import type { SellerSearchResult, Tab } from '@/lib/types';
+import { fetchWallet, getUnreadNotificationCount } from '@/lib/db';
+import { centsToEuros } from '@/lib/format';
 import GhostLogo from '@/components/brand/GhostLogo';
 import BottomNav from '@/components/layout/BottomNav';
 import UnifiedHome from '@/components/app/UnifiedHome';
@@ -16,18 +17,24 @@ export default function AppShell({
   onSignOut,
 }: {
   user: User;
-  preferredMode?: string;
   onSignOut: () => void;
-  onPreferredModeChange?: (m: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>('home');
   const [notifCount, setNotifCount] = useState(0);
   const [walletVersion, setWalletVersion] = useState(0);
+  const [balanceCents, setBalanceCents] = useState(0);
   const [hideNav, setHideNav] = useState(false);
   const [openAuctionId, setOpenAuctionId] = useState<string | null>(null);
+  const [homeResetKey, setHomeResetKey] = useState(0);
+  const [profileShop, setProfileShop] = useState<SellerSearchResult | null>(null);
 
   const refreshNotifs = useCallback(async () => {
     setNotifCount(await getUnreadNotificationCount(user.id));
+  }, [user.id]);
+
+  const refreshBalance = useCallback(async () => {
+    const w = await fetchWallet(user.id);
+    setBalanceCents(w?.balance_cents ?? 0);
   }, [user.id]);
 
   useEffect(() => {
@@ -35,18 +42,25 @@ export default function AppShell({
     if (params.get('wallet')) setTab('wallet');
   }, []);
 
-  useEffect(() => { refreshNotifs(); }, [refreshNotifs]);
+  useEffect(() => { refreshNotifs(); refreshBalance(); }, [refreshNotifs, refreshBalance]);
   useEffect(() => {
-    const id = setInterval(refreshNotifs, 30000);
+    const id = setInterval(() => { refreshNotifs(); refreshBalance(); }, 30000);
     return () => clearInterval(id);
-  }, [refreshNotifs]);
+  }, [refreshNotifs, refreshBalance]);
 
   const goWallet = () => setTab('wallet');
-  const bumpWallet = () => setWalletVersion((v) => v + 1);
+  const bumpWallet = () => { setWalletVersion((v) => v + 1); refreshBalance(); };
 
   const handleOpenAuctionFromNotif = (auctionId: string) => {
     setTab('home');
     setOpenAuctionId(auctionId);
+  };
+
+  const goHome = () => {
+    setTab('home');
+    setOpenAuctionId(null);
+    setProfileShop(null);
+    setHomeResetKey((k) => k + 1);
   };
 
   const content = () => {
@@ -62,14 +76,10 @@ export default function AppShell({
     if (tab === 'profile') {
       return (
         <ProfileScreen
-          userId={user.id}
-          email={user.email}
-          appMode="buyer"
-          preferredMode="both"
+          user={user}
           onSignOut={onSignOut}
-          onModeChange={() => setTab('home')}
-          onPreferredModeChange={() => {}}
           onWallet={goWallet}
+          onOpenShop={(seller) => { setProfileShop(seller); setTab('home'); }}
           walletVersion={walletVersion}
         />
       );
@@ -84,11 +94,14 @@ export default function AppShell({
     }
     return (
       <UnifiedHome
+        key={homeResetKey}
         userId={user.id}
         onWalletNeeded={goWallet}
         onOverlayChange={setHideNav}
         initialAuctionId={openAuctionId}
         onAuctionOpened={() => setOpenAuctionId(null)}
+        initialSeller={profileShop}
+        onSellerOpened={() => setProfileShop(null)}
       />
     );
   };
@@ -100,7 +113,11 @@ export default function AppShell({
           className="header-dark px-4 py-2.5 flex items-center justify-between shrink-0 z-20 relative"
           style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
         >
-          <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={goHome}
+            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+          >
             <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
               <GhostLogo size={22} />
             </div>
@@ -110,7 +127,14 @@ export default function AppShell({
             >
               badirty
             </span>
-          </div>
+          </button>
+          <button
+            type="button"
+            onClick={goWallet}
+            className="text-xs font-bold text-white/70 bg-white/10 px-3 py-1.5 rounded-full hover:bg-white/15 transition-colors tabular-nums"
+          >
+            {centsToEuros(balanceCents)} €
+          </button>
         </div>
       )}
 

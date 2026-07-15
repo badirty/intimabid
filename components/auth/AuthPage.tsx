@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/auth-redirect';
 import { GoogleIcon, XIcon } from '@/components/icons';
 import GhostLogo from '@/components/brand/GhostLogo';
-type AuthView = 'login' | 'signup';
+type AuthView = 'login' | 'signup' | 'forgot';
 
 export default function AuthPage({
   onAuthSuccess,
@@ -52,11 +52,38 @@ export default function AuthPage({
     if (view === 'login') {
       const { error: e } = await supabase.auth.signInWithPassword({ email, password });
       if (e) setError(e.message); else onAuthSuccess?.();
-    } else {
+    } else if (view === 'signup') {
       const { error: e } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
       if (e) setError(e.message);
       else setSuccess('Bienvenue sur badirty ! Un e-mail de confirmation vient d\'être envoyé — clique le lien violet pour activer ton compte.');
     }
+    setLoading(null);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Entre ton e-mail pour réinitialiser.'); return; }
+    setLoading('forgot');
+    setError(null);
+    setSuccess(null);
+    const { error: e } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirectUrl(),
+    });
+    if (e) setError(e.message);
+    else setSuccess('E-mail de réinitialisation envoyé — vérifie ta boîte mail.');
+    setLoading(null);
+  };
+
+  const resendConfirmation = async () => {
+    if (!email) { setError('Entre ton e-mail.'); return; }
+    setLoading('resend');
+    setError(null);
+    const { error: e } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: getAuthRedirectUrl() },
+    });
+    if (e) setError(e.message);
+    else setSuccess('E-mail de confirmation renvoyé.');
     setLoading(null);
   };
 
@@ -85,44 +112,96 @@ export default function AuthPage({
         </div>
 
         <div className="ui-card p-6">
-          <h2 className="font-bold text-lg mb-1">{view === 'login' ? 'Connexion' : 'Inscription'}</h2>
-          <p className="text-text-2 text-xs mb-5">Acheteur ou vendeur — un seul compte</p>
+          <h2 className="font-bold text-lg mb-1">
+            {view === 'login' ? 'Connexion' : view === 'signup' ? 'Inscription' : 'Mot de passe oublié'}
+          </h2>
+          <p className="text-text-2 text-xs mb-5">
+            {view === 'forgot' ? 'On t\'envoie un lien de réinitialisation' : 'Acheteur ou vendeur — un seul compte'}
+          </p>
 
-          <div className="space-y-2">
-            <button onClick={() => signInWithProvider('google')} disabled={!!loading}
-              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
-              <GoogleIcon /> Google
-            </button>
-            <button onClick={() => signInWithProvider('x')} disabled={!!loading}
-              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
-              <XIcon /> X
-            </button>
-          </div>
+          {view !== 'forgot' && (
+            <>
+              <div className="space-y-2">
+                <button onClick={() => signInWithProvider('google')} disabled={!!loading}
+                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
+                  <GoogleIcon /> Google
+                </button>
+                <button onClick={() => signInWithProvider('x')} disabled={!!loading}
+                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
+                  <XIcon /> X
+                </button>
+              </div>
 
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-text-3 text-xs">ou</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-text-3 text-xs">ou</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            </>
+          )}
 
           <div className="space-y-3">
             <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)}
               className="search-bar w-full px-4 py-3 text-sm outline-none" />
-            <input type="password" placeholder="Mot de passe" value={password}
-              onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleEmailAuth()}
-              className="search-bar w-full px-4 py-3 text-sm outline-none" />
+            {view !== 'forgot' && (
+              <input type="password" placeholder="Mot de passe" value={password}
+                onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleEmailAuth()}
+                className="search-bar w-full px-4 py-3 text-sm outline-none" />
+            )}
             {error && <p className="alert-error">{error}</p>}
             {success && <p className="alert-success">{success}</p>}
-            <button onClick={handleEmailAuth} disabled={!!loading}
-              className="btn-buyer w-full py-3.5 text-sm">
-              {loading === 'email' ? '...' : view === 'login' ? 'Se connecter' : 'Créer un compte'}
-            </button>
+            {view === 'forgot' ? (
+              <button onClick={handleForgotPassword} disabled={!!loading}
+                className="btn-buyer w-full py-3.5 text-sm">
+                {loading === 'forgot' ? '...' : 'Envoyer le lien'}
+              </button>
+            ) : (
+              <button onClick={handleEmailAuth} disabled={!!loading}
+                className="btn-buyer w-full py-3.5 text-sm">
+                {loading === 'email' ? '...' : view === 'login' ? 'Se connecter' : 'Créer un compte'}
+              </button>
+            )}
           </div>
 
-          <button onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setError(null); setSuccess(null); }}
-            className="w-full mt-4 text-sm text-buyer font-semibold">
-            {view === 'login' ? "Pas de compte ? S'inscrire" : 'Déjà membre ?'}
-          </button>
+          {view === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setView('forgot'); setError(null); setSuccess(null); }}
+              className="w-full mt-3 text-xs text-text-3 hover:text-accent"
+            >
+              Mot de passe oublié ?
+            </button>
+          )}
+
+          {view === 'signup' && success && (
+            <button
+              type="button"
+              onClick={resendConfirmation}
+              disabled={!!loading}
+              className="w-full mt-3 text-xs text-accent font-semibold"
+            >
+              Renvoyer l&apos;e-mail de confirmation
+            </button>
+          )}
+
+          {view === 'forgot' ? (
+            <button onClick={() => { setView('login'); setError(null); setSuccess(null); }}
+              className="w-full mt-4 text-sm text-buyer font-semibold">
+              Retour à la connexion
+            </button>
+          ) : (
+            <button onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setError(null); setSuccess(null); }}
+              className="w-full mt-4 text-sm text-buyer font-semibold">
+              {view === 'login' ? "Pas de compte ? S'inscrire" : 'Déjà membre ?'}
+            </button>
+          )}
+
+          <p className="text-center text-[10px] text-text-3 mt-4 leading-relaxed">
+            En continuant, tu acceptes nos{' '}
+            <a href="/terms" className="text-accent hover:underline">CGU</a>
+            {' '}et notre{' '}
+            <a href="/privacy" className="text-accent hover:underline">politique de confidentialité</a>.
+          </p>
         </div>
       </div>
     </div>

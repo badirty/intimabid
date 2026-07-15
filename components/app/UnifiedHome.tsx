@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Flame, Heart, Plus, Camera, X, Clock, User, Store, Zap, TrendingUp } from 'lucide-react';
+import { Search, Flame, Heart, Plus, Camera, X, Clock, Store, Zap, TrendingUp } from 'lucide-react';
 import GhostLogo from '@/components/brand/GhostLogo';
+import UserAvatar from '@/components/brand/UserAvatar';
 import type { Auction, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, eurosToCents, isAuctionLive } from '@/lib/format';
 import {
@@ -27,18 +28,32 @@ const DURATION_PRESETS = [
   { label: '36h', hours: 36 },
 ];
 
+function sellerFromAuction(item: Auction): SellerSearchResult {
+  return {
+    id: item.seller_id,
+    display_name: item.seller_name ?? 'Vendeur',
+    live_count: 0,
+    total_sales: 0,
+    avatar_url: item.seller_avatar_url ?? null,
+  };
+}
+
 export default function UnifiedHome({
   userId,
   onWalletNeeded,
   onOverlayChange,
   initialAuctionId,
   onAuctionOpened,
+  initialSeller,
+  onSellerOpened,
 }: {
   userId: string;
   onWalletNeeded?: () => void;
   onOverlayChange?: (open: boolean) => void;
   initialAuctionId?: string | null;
   onAuctionOpened?: () => void;
+  initialSeller?: SellerSearchResult | null;
+  onSellerOpened?: () => void;
 }) {
   const [tab, setTab] = useState<HomeTab>('live');
   const [searchMode, setSearchMode] = useState<SearchMode>('items');
@@ -46,7 +61,7 @@ export default function UnifiedHome({
   const [sellerResults, setSellerResults] = useState<SellerSearchResult[]>([]);
   const [topSellers, setTopSellers] = useState<SellerSearchResult[]>([]);
   const [sellerSearchLoading, setSellerSearchLoading] = useState(false);
-  const [selectedSeller, setSelectedSeller] = useState<SellerSearchResult | null>(null);
+  const [selectedSeller, setSelectedSeller] = useState<SellerSearchResult | null>(initialSeller ?? null);
   const [live, setLive] = useState<Auction[]>([]);
   const [ended, setEnded] = useState<Auction[]>([]);
   const [favorites, setFavorites] = useState<Auction[]>([]);
@@ -107,15 +122,25 @@ export default function UnifiedHome({
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    if (detailAuction || selectedSeller || showCreate) return;
+    const id = setInterval(() => { load(); }, 15000);
+    return () => clearInterval(id);
+  }, [load, detailAuction, selectedSeller, showCreate]);
+
+  useEffect(() => {
     fetchTopSellers(6).then(setTopSellers).catch(() => setTopSellers([]));
   }, []);
 
   useEffect(() => {
+    if (initialSeller) setSelectedSeller(initialSeller);
+  }, [initialSeller]);
+
+  useEffect(() => {
     if (!initialAuctionId) return;
-    fetchAuctionById(initialAuctionId)
+    fetchAuctionById(initialAuctionId, userId)
       .then((a) => { if (a) setDetailAuction(a); })
       .finally(() => onAuctionOpened?.());
-  }, [initialAuctionId, onAuctionOpened]);
+  }, [initialAuctionId, onAuctionOpened, userId]);
 
   useEffect(() => {
     onOverlayChange?.(!!detailAuction || !!selectedSeller || showCreate);
@@ -160,9 +185,21 @@ export default function UnifiedHome({
   const favoriteItems = filterBySearch(favorites);
   const endedItems = filterBySearch(ended);
 
+  const showBidError = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : 'Erreur';
+    setToast(msg);
+    if (msg.includes('Solde')) onWalletNeeded?.();
+  };
+
   const handleBid = async (auction: Auction, amountCents: number) => {
-    try { await placeBid(auction.id, amountCents); setToast('Offre placée !'); await load(); }
-    catch (e) { const msg = e instanceof Error ? e.message : 'Erreur'; if (msg.includes('Solde')) onWalletNeeded?.(); throw e; }
+    try {
+      await placeBid(auction.id, amountCents);
+      setToast('Offre placée !');
+      await load();
+    } catch (e) {
+      showBidError(e);
+      throw e;
+    }
   };
 
   const handleBuyNow = async (auction: Auction) => {
@@ -171,11 +208,12 @@ export default function UnifiedHome({
       setToast('Achat immédiat confirmé !');
       await load();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
-      if (msg.includes('Solde')) onWalletNeeded?.();
+      showBidError(e);
       throw e;
     }
   };
+
+  const openSeller = (seller: SellerSearchResult) => setSelectedSeller(seller);
 
   const handleFavorite = async (auction: Auction) => {
     await toggleFavorite(userId, auction.id, !!auction.is_favorite);
@@ -223,10 +261,16 @@ export default function UnifiedHome({
 
   if (detailAuction) {
     return (
-      <AuctionDetail item={detailAuction} userId={userId}
+      <AuctionDetail
+        item={detailAuction}
+        userId={userId}
         onClose={() => { setDetailAuction(null); load(); }}
-        onBid={handleBid} onBuyNow={handleBuyNow}
-        onFavorite={handleFavorite} onWalletNeeded={onWalletNeeded} />
+        onBid={handleBid}
+        onBuyNow={handleBuyNow}
+        onFavorite={handleFavorite}
+        onWalletNeeded={onWalletNeeded}
+        onOpenSeller={(seller) => { setDetailAuction(null); openSeller(seller); }}
+      />
     );
   }
 
@@ -235,7 +279,7 @@ export default function UnifiedHome({
       <SellerShop
         seller={selectedSeller}
         userId={userId}
-        onBack={() => setSelectedSeller(null)}
+        onBack={() => { setSelectedSeller(null); onSellerOpened?.(); }}
         onOpenAuction={(auction) => setDetailAuction(auction)}
       />
     );
@@ -308,12 +352,10 @@ export default function UnifiedHome({
                 <button
                   key={seller.id}
                   type="button"
-                  onClick={() => setSelectedSeller(seller)}
+                  onClick={() => openSeller(seller)}
                   className="ui-card w-full p-4 flex items-center gap-3 text-left hover:border-accent/30 transition-colors"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
-                    <User className="w-5 h-5 text-accent" />
-                  </div>
+                  <UserAvatar src={seller.avatar_url} name={seller.display_name} size={48} rounded="rounded-xl" />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-text truncate">@{seller.display_name}</p>
                     <p className="text-text-3 text-xs mt-0.5">
@@ -356,12 +398,10 @@ export default function UnifiedHome({
           <button
             key={seller.id}
             type="button"
-            onClick={() => setSelectedSeller(seller)}
+            onClick={() => openSeller(seller)}
             className="ui-card w-full p-4 flex items-center gap-3 text-left hover:border-accent/30 transition-colors"
           >
-            <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
-              <User className="w-5 h-5 text-accent" />
-            </div>
+            <UserAvatar src={seller.avatar_url} name={seller.display_name} size={48} rounded="rounded-xl" />
             <div className="flex-1 min-w-0">
               <p className="font-bold text-text truncate">@{seller.display_name}</p>
               <p className="text-text-3 text-xs mt-0.5">
@@ -417,49 +457,58 @@ export default function UnifiedHome({
               <Flame className="w-3.5 h-3.5" /> Se termine bientôt
             </p>
             {endingSoon.map((item) => (
-              <AuctionCard key={item.id} item={item} featured
+              <AuctionCard key={item.id} item={item} featured isOwner={item.seller_id === userId}
                 onPress={() => setDetailAuction(item)}
                 onBid={(cents) => handleBid(item, cents)}
                 onBuyNow={() => handleBuyNow(item)}
                 onCustomBid={() => setBidModal(item)}
-                onFavorite={() => handleFavorite(item)} />
+                onFavorite={() => handleFavorite(item)}
+                onSellerClick={() => openSeller(sellerFromAuction(item))}
+                onBidError={showBidError} />
             ))}
           </div>
         )}
 
         {!isSellerMode && !loading && tab === 'live' && otherLive.map((item) => (
-          <AuctionCard key={item.id} item={item}
-            onPress={() => setDetailAuction(item)}
-            onBid={(cents) => handleBid(item, cents)}
-            onBuyNow={() => handleBuyNow(item)}
-            onCustomBid={() => setBidModal(item)}
-            onFavorite={() => handleFavorite(item)} />
-        ))}
-
-        {!isSellerMode && !loading && tab === 'favorites' && favoriteItems.map((item) => (
-          <AuctionCard key={item.id} item={item}
+          <AuctionCard key={item.id} item={item} isOwner={item.seller_id === userId}
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onBuyNow={() => handleBuyNow(item)}
             onCustomBid={() => setBidModal(item)}
             onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))}
+            onBidError={showBidError} />
+        ))}
+
+        {!isSellerMode && !loading && tab === 'favorites' && favoriteItems.map((item) => (
+          <AuctionCard key={item.id} item={item} isOwner={item.seller_id === userId}
+            onPress={() => setDetailAuction(item)}
+            onBid={(cents) => handleBid(item, cents)}
+            onBuyNow={() => handleBuyNow(item)}
+            onCustomBid={() => setBidModal(item)}
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))}
+            onBidError={showBidError}
             showEnded={!isAuctionLive(item.status, item.ends_at)} />
         ))}
 
         {!isSellerMode && !loading && tab === 'selling' && mySales.map((item) => (
-          <AuctionCard key={item.id} item={item}
+          <AuctionCard key={item.id} item={item} isOwner
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onCustomBid={() => setBidModal(item)}
-            onFavorite={() => handleFavorite(item)} />
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))} />
         ))}
 
         {!isSellerMode && !loading && tab === 'ended' && endedItems.map((item) => (
-          <AuctionCard key={item.id} item={item}
+          <AuctionCard key={item.id} item={item} isOwner={item.seller_id === userId}
             onPress={() => setDetailAuction(item)}
             onBid={(cents) => handleBid(item, cents)}
             onCustomBid={() => setBidModal(item)}
-            onFavorite={() => handleFavorite(item)} showEnded />
+            onFavorite={() => handleFavorite(item)}
+            onSellerClick={() => openSeller(sellerFromAuction(item))}
+            showEnded />
         ))}
       </div>
 
@@ -695,12 +744,15 @@ function formatDuration(hours: number): string {
 }
 
 function AuctionCard({
-  item, featured, onPress, onBid, onBuyNow, onCustomBid, onFavorite, showEnded,
+  item, featured, isOwner, onPress, onBid, onBuyNow, onCustomBid, onFavorite, onSellerClick, onBidError, showEnded,
 }: {
-  item: Auction; featured?: boolean; onPress?: () => void;
+  item: Auction; featured?: boolean; isOwner?: boolean; onPress?: () => void;
   onBid: (cents: number) => Promise<void>;
   onBuyNow?: () => Promise<void>;
-  onCustomBid: () => void; onFavorite: () => void; showEnded?: boolean;
+  onCustomBid: () => void; onFavorite: () => void;
+  onSellerClick?: () => void;
+  onBidError?: (e: unknown) => void;
+  showEnded?: boolean;
 }) {
   const countdown = useCountdown(item.ends_at);
   const live = isAuctionLive(item.status, item.ends_at);
@@ -712,7 +764,7 @@ function AuctionCard({
   const quickBid = async () => {
     setBidding(true);
     try { await onBid(item.current_price_cents + item.bid_increment_cents); }
-    catch { /* handled */ }
+    catch (e) { onBidError?.(e); }
     finally { setBidding(false); }
   };
 
@@ -737,7 +789,20 @@ function AuctionCard({
         </div>
       </div>
       <div className="p-4">
-        <p className="text-xs text-text-3 mb-1">{item.seller_name}</p>
+        {onSellerClick ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSellerClick(); }}
+            className="text-xs text-accent font-semibold mb-1 hover:underline"
+          >
+            @{item.seller_name}
+          </button>
+        ) : (
+          <p className="text-xs text-text-3 mb-1">@{item.seller_name}</p>
+        )}
+        {isOwner && live && (
+          <p className="text-[10px] text-pink font-bold mb-1">Ta vente</p>
+        )}
         <h2 className="font-bold text-sm text-text leading-snug">{item.title}</h2>
         <div className="flex justify-between items-center mt-3 text-sm">
           <div>
@@ -750,12 +815,12 @@ function AuctionCard({
           </div>
         </div>
         {(item.bid_count ?? 0) > 0 && <p className="text-text-3 text-[11px] mt-2">{item.bid_count} offre{item.bid_count !== 1 ? 's' : ''}</p>}
-        {live && onBuyNow && buyNowPrice && (
+        {live && !isOwner && onBuyNow && buyNowPrice && (
           <button
             onClick={async (e) => {
               e.stopPropagation();
               setBuying(true);
-              try { await onBuyNow(); } catch { /* parent */ }
+              try { await onBuyNow(); } catch (e) { onBidError?.(e); }
               finally { setBuying(false); }
             }}
             disabled={buying}
@@ -765,7 +830,7 @@ function AuctionCard({
             {buying ? '...' : `Acheter · ${buyNowPrice} €`}
           </button>
         )}
-        {live && (
+        {live && !isOwner && (
           <div className="flex gap-2 mt-2">
             <button onClick={(e) => { e.stopPropagation(); quickBid(); }} disabled={bidding} className="btn-accent flex-1 py-2.5 text-xs">
               {bidding ? '...' : `Enchérir · +${centsToEuros(item.bid_increment_cents)} €`}
