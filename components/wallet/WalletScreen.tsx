@@ -66,15 +66,43 @@ export default function WalletScreen({
   const [busy, setBusy] = useState(false);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [withdrawEuros, setWithdrawEuros] = useState(10);
-  const [connectReady, setConnectReady] = useState<boolean | null>(null);
+  type ConnectStatus = {
+    linked: boolean;
+    ready: boolean;
+    payouts_enabled: boolean;
+    currently_due_labels: string[];
+    pending_verification: string[];
+  };
+
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
   const [showConnectOnboarding, setShowConnectOnboarding] = useState(false);
   const paymentHandled = useRef(false);
+
+  const connectReady = !!connectStatus?.ready;
+  const connectLinked = !!connectStatus?.linked;
+  const connectDue = connectStatus?.currently_due_labels ?? [];
 
   const refreshConnectStatus = useCallback(() => {
     fetch('/api/stripe/connect/status', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => setConnectReady(!!d.payouts_enabled))
-      .catch(() => setConnectReady(false));
+      .then((d) => {
+        setConnectStatus({
+          linked: !!(d.linked || d.payouts_enabled || d.has_external_account),
+          ready: !!(d.ready || d.payouts_enabled),
+          payouts_enabled: !!d.payouts_enabled,
+          currently_due_labels: Array.isArray(d.currently_due_labels) ? d.currently_due_labels : [],
+          pending_verification: Array.isArray(d.pending_verification) ? d.pending_verification : [],
+        });
+      })
+      .catch(() =>
+        setConnectStatus({
+          linked: false,
+          ready: false,
+          payouts_enabled: false,
+          currently_due_labels: [],
+          pending_verification: [],
+        }),
+      );
   }, []);
 
   const stripeEnabled = !!config?.stripe;
@@ -418,12 +446,27 @@ export default function WalletScreen({
           Virement vers ton RIB. Formulaire badirty uniquement — pas de parcours « société » Stripe.
           Délai habituel : 1–3 jours ouvrés.
         </p>
-        {connectReady === false && (
+        {connectStatus === null && (
+          <p className="text-text-3 text-xs mb-3">Vérification du compte bancaire…</p>
+        )}
+        {connectStatus && !connectLinked && (
           <p className="text-amber-200/90 text-xs mb-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
             Une seule fois : identité + IBAN. Ensuite tu retires en 1 tap.
           </p>
         )}
-        {connectReady === true && (
+        {connectStatus && connectLinked && !connectReady && (
+          <div className="text-amber-200/90 text-xs mb-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 space-y-1">
+            <p className="font-semibold">✓ Infos enregistrées — validation Stripe en cours</p>
+            <p>
+              Ton RIB est bien lié. Les retraits s’activent quand Stripe valide le compte
+              (parfois immédiat, parfois pièce d’identité requise).
+            </p>
+            {connectDue.length > 0 && (
+              <p className="text-text-2">Encore requis : {connectDue.join(', ')}</p>
+            )}
+          </div>
+        )}
+        {connectReady && (
           <p className="text-seller text-xs mb-3">✓ Compte bancaire connecté — prêt à retirer</p>
         )}
         <div className="flex gap-2 mb-3">
@@ -462,7 +505,11 @@ export default function WalletScreen({
           }}
           className="btn-ghost w-full py-2.5 text-xs mb-2 disabled:opacity-50"
         >
-          {busy ? 'Virement en cours…' : 'Retirer vers mon compte'}
+          {busy
+            ? 'Virement en cours…'
+            : connectLinked && !connectReady
+              ? 'Retrait bientôt dispo (validation Stripe)'
+              : 'Retirer vers mon compte'}
         </button>
         <button
           type="button"
@@ -473,16 +520,26 @@ export default function WalletScreen({
           }}
           className="btn-accent w-full py-2.5 text-xs"
         >
-          {connectReady ? 'Mettre à jour mon RIB' : 'Lier mon compte bancaire'}
+          {connectReady
+            ? 'Mettre à jour mon RIB'
+            : connectLinked
+              ? 'Mettre à jour mes infos / RIB'
+              : 'Lier mon compte bancaire'}
         </button>
       </div>
 
       {showConnectOnboarding && (
         <ConnectOnboarding
-          onClose={() => setShowConnectOnboarding(false)}
+          onClose={() => {
+            setShowConnectOnboarding(false);
+            refreshConnectStatus();
+          }}
           onCompleted={() => {
             setMsg('Configuration bancaire enregistrée');
+            // Petit délai : Stripe peut mettre à jour payouts_enabled en async
             refreshConnectStatus();
+            setTimeout(refreshConnectStatus, 1500);
+            setTimeout(refreshConnectStatus, 4000);
           }}
         />
       )}
