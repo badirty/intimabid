@@ -131,6 +131,114 @@ begin
 end;
 $$;
 
+-- Commande post-vente style Vinted :
+-- 1) si l'acheteur a déjà une adresse → commande « à expédier » tout de suite
+-- 2) sinon → pending_address (l'acheteur doit la renseigner)
+create or replace function public.create_order_for_sold_auction(p_auction_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_a public.auctions%rowtype;
+  v_addr public.user_addresses%rowtype;
+  v_status text;
+  v_price_label text;
+begin
+  select * into v_a from public.auctions where id = p_auction_id;
+  if not found or v_a.status != 'sold' or v_a.winner_id is null then
+    return;
+  end if;
+
+  -- Déjà une commande ? on ne notifie pas en double
+  if exists (select 1 from public.orders where auction_id = p_auction_id) then
+    return;
+  end if;
+
+  v_price_label := to_char(round(v_a.current_price_cents / 100.0, 2), 'FM999999990.00');
+  select * into v_addr from public.user_addresses where user_id = v_a.winner_id;
+
+  if found then
+    v_status := 'awaiting_shipment';
+    insert into public.orders (
+      auction_id, buyer_id, seller_id, amount_cents, status,
+      shipping_full_name, shipping_line1, shipping_line2,
+      shipping_city, shipping_postal_code, shipping_country
+    ) values (
+      v_a.id, v_a.winner_id, v_a.seller_id, v_a.current_price_cents, v_status,
+      v_addr.full_name, v_addr.line1, v_addr.line2,
+      v_addr.city, v_addr.postal_code, v_addr.country
+    );
+
+    insert into public.notifications (user_id, type, title, body, auction_id)
+    values (
+      v_a.winner_id, 'won', 'Achat confirmé 🎉',
+      'Le vendeur prépare l''envoi de « ' || v_a.title || ' » (' || v_price_label || ' €)',
+      v_a.id
+    );
+    insert into public.notifications (user_id, type, title, body, auction_id)
+    values (
+      v_a.seller_id, 'sale', 'À expédier 📦',
+      'Adresse de l''acheteur prête pour « ' || v_a.title || ' » — vois Commandes → Expéditions',
+      v_a.id
+    );
+  else
+    v_status := 'pending_address';
+    insert into public.orders (auction_id, buyer_id, seller_id, amount_cents, status)
+    values (v_a.id, v_a.winner_id, v_a.seller_id, v_a.current_price_cents, v_status);
+
+    insert into public.notifications (user_id, type, title, body, auction_id)
+    values (
+      v_a.winner_id, 'won', 'Indique ton adresse 📍',
+      'Pour recevoir « ' || v_a.title || ' », ouvre Commandes → Achats et valide ton adresse',
+      v_a.id
+    );
+    insert into public.notifications (user_id, type, title, body, auction_id)
+    values (
+      v_a.seller_id, 'sale', 'Vente en attente d''adresse',
+      '« ' || v_a.title || ' » est vendu — l''acheteur doit encore indiquer où livrer (Commandes → Expéditions)',
+      v_a.id
+    );
+  end if;
+end;
+$$;
+
+-- Notif vendeur plus claire quand l'adresse arrive
+create or replace function public.submit_order_address(p_order_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_o public.orders%rowtype;
+  v_a public.user_addresses%rowtype;
+  v_title text;
+begin
+  if v_user is null then raise exception 'Non connecté'; end if;
+  select * into v_o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'Commande introuvable'; end if;
+  if v_o.buyer_id != v_user then raise exception 'Non autorisé'; end if;
+  if v_o.status != 'pending_address' then raise exception 'Adresse déjà validée'; end if;
+
+  select * into v_a from public.user_addresses where user_id = v_user;
+  if not found then raise exception 'Ajoute d''abord ton adresse ci-dessus'; end if;
+
+  update public.orders set
+    status = 'awaiting_shipment',
+    shipping_full_name = v_a.full_name,
+    shipping_line1 = v_a.line1,
+    shipping_line2 = v_a.line2,
+    shipping_city = v_a.city,
+    shipping_postal_code = v_a.postal_code,
+    shipping_country = v_a.country
+  where id = p_order_id;
+
+  select title into v_title from public.auctions where id = v_o.auction_id;
+
+  insert into public.notifications (user_id, type, title, body, auction_id)
+  values (
+    v_o.seller_id, 'ship', 'Adresse reçue — à expédier 📦',
+    'Expédie « ' || coalesce(v_title, 'la commande') || ' » : ouvre Commandes → Expéditions pour voir l''adresse',
+    v_o.auction_id
+  );
+end;
+$$;
+
 -- Rattrapage : ventes déjà sold sans sale_credit vendeur
 do $$
 declare r record;

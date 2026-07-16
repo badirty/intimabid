@@ -14,12 +14,19 @@ function notifIcon(type: string) {
   return <Bell className="w-4 h-4 text-text-3" />;
 }
 
+const ORDER_NOTIF_TYPES = new Set([
+  'won', 'sale', 'sold', 'ship', 'shipped', 'delivered',
+]);
+
 export default function NotificationsScreen({
   userId,
   onOpenAuction,
+  onOpenOrders,
 }: {
   userId: string;
   onOpenAuction?: (auctionId: string) => void;
+  /** Ouvre l'onglet Commandes (Achats ou Expéditions selon le type de notif) */
+  onOpenOrders?: (mode: 'buyer' | 'seller') => void;
 }) {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +41,14 @@ export default function NotificationsScreen({
 
   const handleTap = async (n: Notification) => {
     if (!n.read) await markNotificationRead(n.id);
+
+    // Ventes / livraisons → Commandes (flux type Vinted), pas l'enchère
+    if (ORDER_NOTIF_TYPES.has(n.type) && onOpenOrders) {
+      const sellerSide = n.type === 'sale' || n.type === 'sold' || n.type === 'ship';
+      onOpenOrders(sellerSide ? 'seller' : 'buyer');
+      return;
+    }
+
     if (n.auction_id && onOpenAuction) {
       onOpenAuction(n.auction_id);
       return;
@@ -86,7 +101,11 @@ export default function NotificationsScreen({
                 {n.body && <p className="text-text-2 text-xs mt-1">{n.body}</p>}
                 <p className="text-text-3 text-[10px] mt-2">
                   {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })}
-                  {n.auction_id ? ' · Voir l\'enchère →' : ''}
+                  {ORDER_NOTIF_TYPES.has(n.type)
+                    ? ' · Voir la commande →'
+                    : n.auction_id
+                      ? ' · Voir l\'enchère →'
+                      : ''}
                 </p>
               </div>
             </div>

@@ -69,6 +69,11 @@ export default function AppShell({
     setOpenAuctionId(auctionId);
   };
 
+  const handleOpenOrdersFromNotif = (mode: 'buyer' | 'seller') => {
+    setOrdersMode(mode);
+    setTab('orders');
+  };
+
   const goHome = () => {
     setTab('home');
     setOpenAuctionId(null);
@@ -123,6 +128,7 @@ export default function AppShell({
         <NotificationsScreen
           userId={user.id}
           onOpenAuction={handleOpenAuctionFromNotif}
+          onOpenOrders={handleOpenOrdersFromNotif}
         />
       );
     }
