@@ -86,12 +86,20 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
         message?: string;
         payouts_enabled?: boolean;
         ready?: boolean;
+        tos_accept_url?: string | null;
       };
       if (!res.ok) throw new Error(data.error ?? 'Échec de l’enregistrement');
 
       setInfo(data.message ?? 'Compte lié');
       onCompleted();
-      // Laisse voir le message succès une fraction de seconde
+
+      // Express : Stripe exige encore d'accepter les CGU → 1 écran Stripe (pas le long parcours société)
+      if (data.tos_accept_url && !data.payouts_enabled) {
+        setInfo('Redirection pour accepter les conditions Stripe…');
+        window.location.assign(data.tos_accept_url);
+        return;
+      }
+
       setTimeout(() => onClose(), data.payouts_enabled || data.ready ? 600 : 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');

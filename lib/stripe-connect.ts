@@ -122,6 +122,8 @@ export async function setupPayoutWithIdentity(
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
   currentlyDue: string[];
+  /** Si Express bloque sur le ToS : lien court Stripe (souvent juste « Accepter ») */
+  tosAcceptUrl?: string | null;
 }> {
   if (!stripeSecretKey) throw new Error('Stripe non configuré');
   if (!user.email) throw new Error('Email manquant sur le compte');
@@ -194,11 +196,31 @@ export async function setupPayoutWithIdentity(
           },
         });
         const refreshed = await stripe.accounts.retrieve(previousId);
+        const due = refreshed.requirements?.currently_due ?? [];
+        let tosAcceptUrl: string | null = null;
+        if (due.some((r) => r.includes('tos_acceptance')) && !refreshed.payouts_enabled) {
+          try {
+            const link = await stripe.accountLinks.create({
+              account: previousId,
+              refresh_url: `${siteUrl}/?wallet=connect_refresh`,
+              return_url: `${siteUrl}/?wallet=connect_done`,
+              type: 'account_onboarding',
+              collection_options: {
+                fields: 'currently_due',
+                future_requirements: 'omit',
+              },
+            });
+            tosAcceptUrl = link.url;
+          } catch {
+            /* ignore */
+          }
+        }
         return {
           accountId: previousId,
           payoutsEnabled: !!refreshed.payouts_enabled,
           detailsSubmitted: !!refreshed.details_submitted,
-          currentlyDue: refreshed.requirements?.currently_due ?? [],
+          currentlyDue: due,
+          tosAcceptUrl,
         };
       }
     } catch {
@@ -339,11 +361,38 @@ export async function setupPayoutWithIdentity(
   await persistConnectAccountId(user.id, account.id, supabase);
 
   const full = await stripe.accounts.retrieve(account.id);
+  const currentlyDue = full.requirements?.currently_due ?? [];
+  let tosAcceptUrl: string | null = null;
+
+  // Express : la plateforme ne peut pas cocher le ToS → lien d'onboarding minimal
+  const needsTos = currentlyDue.some((r) => r.includes('tos_acceptance'));
+  if (needsTos && !full.payouts_enabled) {
+    try {
+      const link = await stripe.accountLinks.create({
+        account: full.id,
+        refresh_url: `${siteUrl}/?wallet=connect_refresh`,
+        return_url: `${siteUrl}/?wallet=connect_done`,
+        type: 'account_onboarding',
+        collection_options: {
+          fields: 'currently_due',
+          future_requirements: 'omit',
+        },
+      });
+      tosAcceptUrl = link.url;
+    } catch (e) {
+      console.warn(
+        '[stripe-connect] accountLink for tos failed:',
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+
   return {
     accountId: full.id,
     payoutsEnabled: !!full.payouts_enabled,
     detailsSubmitted: !!full.details_submitted,
-    currentlyDue: full.requirements?.currently_due ?? [],
+    currentlyDue,
+    tosAcceptUrl,
   };
 }
 

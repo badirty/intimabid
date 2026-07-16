@@ -54,13 +54,17 @@ export async function POST(request: Request) {
       payouts_enabled: result.payoutsEnabled,
       ready: ready || result.payoutsEnabled,
       currently_due: result.currentlyDue,
+      /** Rediriger l'user ici si Express exige encore l'acceptation des CGU */
+      tos_accept_url: result.tosAcceptUrl ?? null,
       message: result.payoutsEnabled
         ? 'Compte bancaire lié — tu peux retirer.'
-        : result.currentlyDue.some((r) => r.includes('tos_acceptance'))
-          ? 'Infos enregistrées, mais acceptation des conditions Stripe encore en attente (compte limité).'
-          : result.currentlyDue.some((r) => r.includes('verification'))
-            ? 'Infos enregistrées. Une vérification d’identité peut encore être demandée par Stripe.'
-            : 'Infos enregistrées. Les retraits s’activent dès validation Stripe (souvent immédiat).',
+        : result.tosAcceptUrl
+          ? 'Dernière étape : accepte les conditions Stripe (1 écran), puis tu pourras retirer.'
+          : result.currentlyDue.some((r) => r.includes('tos_acceptance'))
+            ? 'Infos enregistrées, mais acceptation des conditions Stripe encore en attente (compte limité).'
+            : result.currentlyDue.some((r) => r.includes('verification'))
+              ? 'Infos enregistrées. Une vérification d’identité peut encore être demandée par Stripe.'
+              : 'Infos enregistrées. Les retraits s’activent dès validation Stripe (souvent immédiat).',
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur configuration retrait';
