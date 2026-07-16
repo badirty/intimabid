@@ -9,23 +9,30 @@ import {
   supabaseUrl,
 } from '@/lib/env';
 
-/** Tag metadata pour savoir si le compte a le bon setup "retrait particulier". */
-const ACCOUNT_KIND = 'recipient_individual_v2';
+/**
+ * Tag metadata — bump de version = force recreation des anciens comptes
+ * (ex. ceux qui avaient url=badirty.fr comme "site de l'entreprise").
+ */
+const ACCOUNT_KIND = 'recipient_individual_v3';
 
 /**
  * Compte Connect = **personne physique qui reçoit des virements** (retrait wallet).
- * - business_type: individual (pas company / société)
- * - service_agreement: recipient (pas "full merchant" — uniquement recevoir des fonds de la plateforme)
- * - capabilities: transfers only (pas card_payments)
  *
- * Note FR : l'UI Stripe peut encore afficher "Entrepreneur individuel" / "type d'entreprise"
- * dans le libellé légal — ce n'est PAS une SARL. Côté API c'est `individual` + `recipient`.
+ * Important : ne PAS mettre l'URL racine de la plateforme (badirty.fr) comme
+ * business_profile.url — Stripe l'affiche comme "Site web de l'entreprise"
+ * et le vendeur croit qu'on lui crée une société badirty.
+ * On utilise la page profil vendeur de cet utilisateur à la place.
  */
-function createRecipientIndividualAccount(stripe: Stripe, email?: string) {
+function createRecipientIndividualAccount(
+  stripe: Stripe,
+  opts: { email?: string; userId: string },
+) {
+  const sellerProfileUrl = `${siteUrl.replace(/\/$/, '')}/seller/${opts.userId}`;
+
   return stripe.accounts.create({
     type: 'express',
     country: 'FR',
-    email,
+    email: opts.email,
     business_type: 'individual',
     capabilities: {
       transfers: { requested: true },
@@ -35,13 +42,14 @@ function createRecipientIndividualAccount(stripe: Stripe, email?: string) {
       service_agreement: 'recipient',
     },
     individual: {
-      email,
+      email: opts.email,
     },
-    // Minimal : évite un profil "boutique" trop chargé
     business_profile: {
-      product_description: 'Retrait de solde badirty (particulier)',
-      mcc: '7299', // Miscellaneous personal services — neutre
-      url: siteUrl,
+      // Activité C2C de la personne — pas "la société badirty"
+      product_description:
+        'Vendeur particulier : revente d’articles entre particuliers sur la marketplace badirty',
+      mcc: '5931', // Used merchandise and secondhand stores
+      url: sellerProfileUrl,
     },
     settings: {
       payouts: {
@@ -51,6 +59,7 @@ function createRecipientIndividualAccount(stripe: Stripe, email?: string) {
     metadata: {
       platform: 'badirty',
       account_kind: ACCOUNT_KIND,
+      user_id: opts.userId,
     },
   });
 }
@@ -192,8 +201,12 @@ export async function ensureIndividualConnectAccount(
 
   if (!accountId) {
     let account: Stripe.Account;
+    const sellerProfileUrl = `${siteUrl.replace(/\/$/, '')}/seller/${user.id}`;
     try {
-      account = await createRecipientIndividualAccount(stripe, user.email ?? undefined);
+      account = await createRecipientIndividualAccount(stripe, {
+        email: user.email ?? undefined,
+        userId: user.id,
+      });
     } catch (e) {
       // Si recipient non dispo sur le compte plateforme (config Dashboard),
       // fallback individual express classique — toujours pas company.
@@ -207,13 +220,15 @@ export async function ensureIndividualConnectAccount(
         capabilities: { transfers: { requested: true } },
         individual: { email: user.email ?? undefined },
         business_profile: {
-          product_description: 'Retrait de solde badirty (particulier)',
-          mcc: '7299',
-          url: siteUrl,
+          product_description:
+            'Vendeur particulier : revente d’articles entre particuliers sur la marketplace badirty',
+          mcc: '5931',
+          url: sellerProfileUrl,
         },
         metadata: {
           platform: 'badirty',
           account_kind: ACCOUNT_KIND,
+          user_id: user.id,
           recipient_fallback: '1',
         },
       });

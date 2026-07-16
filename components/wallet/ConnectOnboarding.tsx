@@ -165,10 +165,9 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
             <div className="text-xs text-text-2 space-y-1">
               <p className="font-semibold text-text">Particulier · retrait vers ton RIB</p>
               <p>
-                Stripe affiche parfois « type d’entreprise » : choisis{' '}
-                <strong className="text-text">Entrepreneur individuel</strong>
-                {' '}(personne physique). <strong className="text-text">Pas Société</strong>, pas Association.
-                C’est le libellé légal Stripe — ce n’est pas une SARL ni un SIRET obligatoire pour démarrer.
+                Stripe peut afficher un « site web » : c’est ta page vendeur badirty (pas une société).
+                Pour le type : choisis <strong className="text-text">Entrepreneur individuel</strong>
+                {' '}— <strong className="text-text">pas Société</strong>.
               </p>
             </div>
           </div>
