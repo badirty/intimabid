@@ -38,9 +38,20 @@ function createIndividualExpressAccount(stripe: Stripe, email?: string) {
   });
 }
 
-function shouldRecreateAsIndividual(account: Stripe.Account): boolean {
-  if (account.payouts_enabled || account.details_submitted) return false;
-  return account.business_type !== 'individual';
+/**
+ * Anciens comptes créés avant le fix (souvent company / type vide) :
+ * on ne les garde QUE s'ils sont déjà en `individual`.
+ * Un compte société avec des infos déjà saisies bloquait le flux — d'où
+ * le bug "on me demande encore l'état de ma société".
+ */
+function shouldRecreateAsIndividual(account: Stripe.Account, forceReset = false): boolean {
+  if (forceReset) return true;
+  // Déjà particulier → on continue l'onboarding / le compte existant
+  if (account.business_type === 'individual') return false;
+  // Société (ou type inconnu) avec retraits déjà actifs : rare, on laisse
+  if (account.payouts_enabled && account.business_type === 'company') return false;
+  // Sinon : company, null, ou partiellement rempli → nouveau compte particulier
+  return true;
 }
 
 export type ResolvedUser = {
@@ -68,19 +79,40 @@ export async function resolveRequestUser(request: Request): Promise<ResolvedUser
   return { id: tokenUser.id, email: tokenUser.email };
 }
 
+async function persistConnectAccountId(
+  userId: string,
+  accountId: string,
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+) {
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, stripe_connect_id: accountId }, { onConflict: 'id' });
+
+  if (error) {
+    if (!supabaseServiceRoleKey) throw new Error(error.message);
+    const admin = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const { error: adminErr } = await admin
+      .from('profiles')
+      .upsert({ id: userId, stripe_connect_id: accountId }, { onConflict: 'id' });
+    if (adminErr) throw new Error(adminErr.message);
+  }
+}
+
 /**
  * Garantit un compte Connect Express **particulier** lié au profil.
- * Recrée le compte s'il était bloqué en parcours société (non finalisé).
+ * Remplace les anciens comptes société (même si des infos avaient été saisies).
  */
 export async function ensureIndividualConnectAccount(
   user: ResolvedUser,
-): Promise<{ accountId: string; stripe: Stripe }> {
+  opts?: { forceReset?: boolean },
+): Promise<{ accountId: string; stripe: Stripe; recreated: boolean }> {
   if (!stripeSecretKey) {
     throw new Error('Stripe non configuré');
   }
 
   const stripe = new Stripe(stripeSecretKey);
   const supabase = await createServerSupabase();
+  const forceReset = opts?.forceReset === true;
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -89,35 +121,48 @@ export async function ensureIndividualConnectAccount(
     .maybeSingle();
 
   let accountId = profile?.stripe_connect_id as string | undefined;
+  let recreated = false;
+  let previousAccountId: string | undefined;
 
   if (accountId) {
     try {
       const existing = await stripe.accounts.retrieve(accountId);
-      if (shouldRecreateAsIndividual(existing)) {
+      if (shouldRecreateAsIndividual(existing, forceReset)) {
+        previousAccountId = accountId;
         accountId = undefined;
+        recreated = true;
+        console.info(
+          '[stripe-connect] recreate as individual',
+          {
+            userId: user.id,
+            previous: previousAccountId,
+            wasType: existing.business_type,
+            details_submitted: existing.details_submitted,
+            forceReset,
+          },
+        );
       }
     } catch {
+      previousAccountId = accountId;
       accountId = undefined;
+      recreated = true;
     }
   }
 
   if (!accountId) {
     const account = await createIndividualExpressAccount(stripe, user.email ?? undefined);
     accountId = account.id;
+    await persistConnectAccountId(user.id, accountId, supabase);
 
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({ id: user.id, stripe_connect_id: accountId }, { onConflict: 'id' });
-
-    if (error) {
-      if (!supabaseServiceRoleKey) throw new Error(error.message);
-      const admin = createClient(supabaseUrl, supabaseServiceRoleKey);
-      const { error: adminErr } = await admin
-        .from('profiles')
-        .upsert({ id: user.id, stripe_connect_id: accountId }, { onConflict: 'id' });
-      if (adminErr) throw new Error(adminErr.message);
+    // Ancien compte orphelin (Express) : on tente une suppression soft, non bloquante
+    if (previousAccountId) {
+      try {
+        await stripe.accounts.del(previousAccountId);
+      } catch {
+        /* Express non toujours supprimable — ignore */
+      }
     }
   }
 
-  return { accountId, stripe };
+  return { accountId, stripe, recreated };
 }

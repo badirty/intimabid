@@ -27,7 +27,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Session expirée — reconnecte-toi.' }, { status: 401 });
     }
 
-    const { accountId, stripe } = await ensureIndividualConnectAccount(user);
+    let forceReset = false;
+    try {
+      const body = await request.json();
+      forceReset = body?.force_reset === true;
+    } catch {
+      /* body vide OK */
+    }
+
+    const { accountId, stripe, recreated } = await ensureIndividualConnectAccount(user, {
+      forceReset,
+    });
+
+    // Vérif sécurité : le compte utilisé doit bien être individual
+    const account = await stripe.accounts.retrieve(accountId);
+    if (account.business_type && account.business_type !== 'individual') {
+      const retry = await ensureIndividualConnectAccount(user, { forceReset: true });
+      const session = await retry.stripe.accountSessions.create({
+        account: retry.accountId,
+        components: {
+          account_onboarding: {
+            enabled: true,
+            features: { external_account_collection: true },
+          },
+        },
+      });
+      return NextResponse.json({
+        client_secret: session.client_secret,
+        publishable_key: stripePublishableKey,
+        recreated: true,
+        business_type: 'individual',
+      });
+    }
 
     const accountSession = await stripe.accountSessions.create({
       account: accountId,
@@ -45,6 +76,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       client_secret: accountSession.client_secret,
       publishable_key: stripePublishableKey,
+      recreated,
+      business_type: account.business_type ?? 'individual',
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur Account Session';

@@ -30,6 +30,10 @@ export async function GET() {
     connected: true,
     payouts_enabled: account.payouts_enabled ?? false,
     details_submitted: account.details_submitted ?? false,
+    business_type: account.business_type ?? null,
+    /** true si l'ancien compte société doit être remplacé au prochain onboarding */
+    needs_individual_reset:
+      account.business_type !== 'individual' && !(account.payouts_enabled && account.business_type === 'company'),
     connect_account_id: connectId,
   });
 }

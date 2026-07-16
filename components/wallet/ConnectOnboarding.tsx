@@ -47,15 +47,21 @@ async function authHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
-async function createAccountSession(): Promise<{ client_secret: string; publishable_key: string }> {
+async function createAccountSession(forceReset = false): Promise<{
+  client_secret: string;
+  publishable_key: string;
+  recreated?: boolean;
+}> {
   const res = await fetch('/api/stripe/connect/account-session', {
     method: 'POST',
     credentials: 'same-origin',
     headers: await authHeaders(),
+    body: JSON.stringify({ force_reset: forceReset }),
   });
   const data = (await res.json()) as {
     client_secret?: string;
     publishable_key?: string;
+    recreated?: boolean;
     error?: string;
   };
   if (!res.ok || !data.client_secret || !data.publishable_key) {
@@ -64,6 +70,7 @@ async function createAccountSession(): Promise<{ client_secret: string; publisha
   return {
     client_secret: data.client_secret,
     publishable_key: data.publishable_key,
+    recreated: data.recreated,
   };
 }
 
@@ -71,6 +78,9 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
   const [connectInstance, setConnectInstance] = useState<StripeConnectInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [banner, setBanner] = useState<string | null>(null);
+  /** Incrémenté pour remonter le formulaire (ex. reset forcé) */
+  const [bootKey, setBootKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,11 +89,17 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
       try {
         setLoading(true);
         setError(null);
+        setConnectInstance(null);
 
-        const first = await createAccountSession();
+        // 1er appel : remplace auto les anciens comptes société
+        // bootKey > 0 → force_reset explicite (bouton "recommencer particulier")
+        const first = await createAccountSession(bootKey > 0);
         if (cancelled) return;
 
-        // Réutilise le 1er client_secret, puis en crée un nouveau si Connect le redemande
+        if (first.recreated || bootKey > 0) {
+          setBanner('Nouveau parcours particulier — plus de questions société / SIRET.');
+        }
+
         let cachedSecret: string | null = first.client_secret;
 
         const instance = loadConnectAndInitialize({
@@ -94,7 +110,7 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
               cachedSecret = null;
               return secret;
             }
-            const next = await createAccountSession();
+            const next = await createAccountSession(false);
             return next.client_secret;
           },
           locale: 'fr-FR',
@@ -114,7 +130,7 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bootKey]);
 
   const handleExit = () => {
     onCompleted();
@@ -155,6 +171,12 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
             </div>
           </div>
 
+          {banner && (
+            <p className="text-xs text-seller font-semibold mb-3 bg-pink/10 border border-pink/20 rounded-lg px-3 py-2">
+              {banner}
+            </p>
+          )}
+
           {loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-text-2">
               <Loader2 className="w-8 h-8 animate-spin text-accent" />
@@ -192,6 +214,20 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
                 />
               </ConnectComponentsProvider>
             </div>
+          )}
+
+          {!loading && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                setBanner(null);
+                setBootKey((k) => k + 1);
+              }}
+              className="mt-4 w-full text-center text-[11px] text-text-3 underline underline-offset-2 hover:text-text-2 py-2"
+            >
+              Toujours des questions société ? Recommencer en particulier
+            </button>
           )}
         </div>
       </div>
