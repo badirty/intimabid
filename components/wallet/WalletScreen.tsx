@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import GhostLogo from '@/components/brand/GhostLogo';
+import ConnectOnboarding from '@/components/wallet/ConnectOnboarding';
 
 type AppConfig = {
   stripe: boolean;
@@ -66,7 +67,15 @@ export default function WalletScreen({
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [withdrawEuros, setWithdrawEuros] = useState(10);
   const [connectReady, setConnectReady] = useState<boolean | null>(null);
+  const [showConnectOnboarding, setShowConnectOnboarding] = useState(false);
   const paymentHandled = useRef(false);
+
+  const refreshConnectStatus = useCallback(() => {
+    fetch('/api/stripe/connect/status', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setConnectReady(!!d.payouts_enabled))
+      .catch(() => setConnectReady(false));
+  }, []);
 
   const stripeEnabled = !!config?.stripe;
   const demoEnabled = !!config?.demoWallet;
@@ -103,11 +112,8 @@ export default function WalletScreen({
 
   useEffect(() => {
     if (!stripeEnabled) return;
-    fetch('/api/stripe/connect/status', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d) => setConnectReady(!!d.payouts_enabled))
-      .catch(() => setConnectReady(false));
-  }, [stripeEnabled]);
+    refreshConnectStatus();
+  }, [stripeEnabled, refreshConnectStatus]);
 
   useEffect(() => {
     if (paymentHandled.current) return;
@@ -124,11 +130,8 @@ export default function WalletScreen({
     }
 
     if (walletStatus === 'connect_done' || walletStatus === 'connect_refresh') {
-      setMsg('Stripe Connect mis à jour');
-      fetch('/api/stripe/connect/status', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((d) => setConnectReady(!!d.payouts_enabled))
-        .catch(() => setConnectReady(false));
+      setMsg('Compte bancaire mis à jour');
+      refreshConnectStatus();
       return;
     }
 
@@ -180,7 +183,7 @@ export default function WalletScreen({
         setError('Paiement reçu mais solde pas encore crédité. Recharge la page dans 1 min.');
       }
     })();
-  }, [userId, load, onBalanceChange]);
+  }, [userId, load, onBalanceChange, refreshConnectStatus]);
 
   const recharge = async (mode: 'demo' | 'stripe') => {
     const cents = eurosToCents(topupEuros);
@@ -410,17 +413,18 @@ export default function WalletScreen({
       </div>
 
       <div className="ui-card p-5 mb-3">
-        <h2 className="font-bold text-sm mb-3">Retirer (vendeur)</h2>
+        <h2 className="font-bold text-sm mb-3">Retirer vers mon compte</h2>
         <p className="text-text-3 text-xs mb-3">
-          Virement automatique vers ton compte bancaire via Stripe Connect (1–3 jours ouvrés).
+          Virement vers ton RIB personnel (particulier). Pas de société requise.
+          Délai habituel : 1–3 jours ouvrés.
         </p>
         {connectReady === false && (
           <p className="text-amber-200/90 text-xs mb-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-            Configure Stripe Connect ci-dessous avant ton premier retrait.
+            Une seule fois : identité + RIB (quelques clics). Ensuite tu retires en 1 tap.
           </p>
         )}
         {connectReady === true && (
-          <p className="text-seller text-xs mb-3">✓ Compte bancaire connecté</p>
+          <p className="text-seller text-xs mb-3">✓ Compte bancaire connecté — prêt à retirer</p>
         )}
         <div className="flex gap-2 mb-3">
           <input
@@ -463,28 +467,25 @@ export default function WalletScreen({
         <button
           type="button"
           disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              const res = await fetch('/api/stripe/connect/onboard', {
-                method: 'POST',
-                headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-              });
-              const data = await res.json();
-              if (data.url) window.location.assign(data.url);
-              else setError(data.error ?? 'Erreur Stripe Connect');
-            } catch {
-              setError('Stripe Connect indisponible');
-            } finally {
-              setBusy(false);
-            }
+          onClick={() => {
+            setError(null);
+            setShowConnectOnboarding(true);
           }}
           className="btn-accent w-full py-2.5 text-xs"
         >
-          Configurer Stripe Connect
+          {connectReady ? 'Mettre à jour mon RIB' : 'Lier mon compte bancaire'}
         </button>
       </div>
+
+      {showConnectOnboarding && (
+        <ConnectOnboarding
+          onClose={() => setShowConnectOnboarding(false)}
+          onCompleted={() => {
+            setMsg('Configuration bancaire enregistrée');
+            refreshConnectStatus();
+          }}
+        />
+      )}
 
       {transactions.length > 0 && (
         <div className="ui-card p-4 mb-3">

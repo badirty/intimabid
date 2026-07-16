@@ -1,45 +1,41 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
-import { createClient } from '@/lib/supabase/server';
-import { stripeSecretKey, siteUrl } from '@/lib/env';
+import {
+  ensureIndividualConnectAccount,
+  resolveRequestUser,
+} from '@/lib/stripe-connect';
+import { siteUrl, stripeSecretKey } from '@/lib/env';
 
-export async function POST() {
+/**
+ * Fallback : onboarding Stripe hébergé (redirect).
+ * Le flux principal est l'embedded via /api/stripe/connect/account-session.
+ */
+export async function POST(request: Request) {
   if (!stripeSecretKey) {
     return NextResponse.json({ error: 'Stripe non configuré' }, { status: 503 });
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+  try {
+    const user = await resolveRequestUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+    }
 
-  const stripe = new Stripe(stripeSecretKey);
+    const { accountId, stripe } = await ensureIndividualConnectAccount(user);
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('stripe_connect_id, display_name')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  let accountId = profile?.stripe_connect_id as string | undefined;
-
-  if (!accountId) {
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'FR',
-      email: user.email ?? undefined,
-      capabilities: { transfers: { requested: true } },
-      business_profile: { name: profile?.display_name ?? 'badirty vendeur' },
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${siteUrl}/?wallet=connect_refresh`,
+      return_url: `${siteUrl}/?wallet=connect_done`,
+      type: 'account_onboarding',
+      collection_options: {
+        fields: 'currently_due',
+        future_requirements: 'omit',
+      },
     });
-    accountId = account.id;
-    await supabase.from('profiles').upsert({ id: user.id, stripe_connect_id: accountId }, { onConflict: 'id' });
+
+    return NextResponse.json({ url: link.url });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Erreur Stripe Connect';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const link = await stripe.accountLinks.create({
-    account: accountId,
-    refresh_url: `${siteUrl}/?wallet=connect_refresh`,
-    return_url: `${siteUrl}/?wallet=connect_done`,
-    type: 'account_onboarding',
-  });
-
-  return NextResponse.json({ url: link.url });
 }
