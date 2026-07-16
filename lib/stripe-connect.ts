@@ -12,8 +12,12 @@ import {
 /**
  * Comptes créés via le formulaire Badirty (pas l'UI Stripe "type d'entreprise").
  * business_type / site / MCC : uniquement côté serveur, jamais montrés à l'user.
+ *
+ * Important FR→FR : ne PAS utiliser service_agreement: 'recipient'
+ * (Stripe : "not supported for platforms in FR creating accounts in FR").
+ * On utilise l'accord full par défaut.
  */
-const ACCOUNT_KIND = 'badirty_payout_form_v1';
+const ACCOUNT_KIND = 'badirty_payout_form_v2';
 
 export type ResolvedUser = {
   id: string;
@@ -234,7 +238,8 @@ export async function setupPayoutWithIdentity(
   let account: Stripe.Account;
 
   try {
-    // Custom = l'UI Stripe "entreprise" n'est jamais montrée à l'utilisateur
+    // Custom = l'UI Stripe "entreprise" n'est jamais montrée à l'utilisateur.
+    // ToS full (défaut) — recipient interdit pour plateforme FR → compte FR.
     account = await stripe.accounts.create({
       type: 'custom',
       country: 'FR',
@@ -246,7 +251,6 @@ export async function setupPayoutWithIdentity(
       tos_acceptance: {
         date: tosDate,
         ip,
-        service_agreement: 'recipient',
       },
       business_profile: businessProfile,
       individual,
@@ -264,14 +268,13 @@ export async function setupPayoutWithIdentity(
     const msg = e instanceof Error ? e.message : String(e);
     console.warn('[stripe-connect] custom create failed, try express prefilled:', msg);
 
-    // Fallback Express : toujours prérempli, mais Stripe peut demander une vérif doc plus tard
+    // Fallback Express prérempli (ToS accepté pendant/via nos données, pas recipient)
     account = await stripe.accounts.create({
       type: 'express',
       country: 'FR',
       email: user.email,
       business_type: 'individual',
       capabilities: { transfers: { requested: true } },
-      tos_acceptance: { service_agreement: 'recipient' },
       business_profile: businessProfile,
       individual,
       external_account: externalAccount,
