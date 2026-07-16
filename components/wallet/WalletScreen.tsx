@@ -415,12 +415,12 @@ export default function WalletScreen({
       <div className="ui-card p-5 mb-3">
         <h2 className="font-bold text-sm mb-3">Retirer vers mon compte</h2>
         <p className="text-text-3 text-xs mb-3">
-          Virement vers ton RIB personnel (particulier). Pas de société requise.
+          Virement vers ton RIB. Formulaire badirty uniquement — pas de parcours « société » Stripe.
           Délai habituel : 1–3 jours ouvrés.
         </p>
         {connectReady === false && (
           <p className="text-amber-200/90 text-xs mb-3 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-            Une seule fois : identité + RIB (quelques clics). Ensuite tu retires en 1 tap.
+            Une seule fois : identité + IBAN. Ensuite tu retires en 1 tap.
           </p>
         )}
         {connectReady === true && (

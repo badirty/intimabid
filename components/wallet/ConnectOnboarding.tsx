@@ -1,39 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { loadConnectAndInitialize } from '@stripe/connect-js/pure';
-import type { StripeConnectInstance } from '@stripe/connect-js';
-import {
-  ConnectAccountOnboarding,
-  ConnectComponentsProvider,
-} from '@stripe/react-connect-js';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import GhostLogo from '@/components/brand/GhostLogo';
 
-const BADIRTY_APPEARANCE = {
-  overlays: 'dialog' as const,
-  variables: {
-    colorPrimary: '#a855f7',
-    colorBackground: '#0d0b18',
-    colorText: '#faf5ff',
-    colorDanger: '#f43f5e',
-    buttonPrimaryColorBackground: '#a855f7',
-    buttonPrimaryColorBorder: '#a855f7',
-    buttonPrimaryColorText: '#ffffff',
-    buttonSecondaryColorBackground: 'rgba(255,255,255,0.06)',
-    buttonSecondaryColorBorder: 'rgba(255,255,255,0.12)',
-    buttonSecondaryColorText: '#faf5ff',
-    borderRadius: '12px',
-    spacingUnit: '10px',
-    fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
-    fontSizeBase: '15px',
-  },
-};
-
 type Props = {
   onClose: () => void;
   onCompleted: () => void;
+};
+
+type FormState = {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  postalCode: string;
+  iban: string;
+};
+
+const emptyForm: FormState = {
+  firstName: '',
+  lastName: '',
+  birthDate: '',
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  postalCode: '',
+  iban: '',
 };
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -47,94 +43,61 @@ async function authHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
-async function createAccountSession(forceReset = false): Promise<{
-  client_secret: string;
-  publishable_key: string;
-  recreated?: boolean;
-}> {
-  const res = await fetch('/api/stripe/connect/account-session', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: await authHeaders(),
-    body: JSON.stringify({ force_reset: forceReset }),
-  });
-  const data = (await res.json()) as {
-    client_secret?: string;
-    publishable_key?: string;
-    recreated?: boolean;
-    error?: string;
-  };
-  if (!res.ok || !data.client_secret || !data.publishable_key) {
-    throw new Error(data.error ?? 'Impossible de démarrer la config bancaire');
-  }
-  return {
-    client_secret: data.client_secret,
-    publishable_key: data.publishable_key,
-    recreated: data.recreated,
-  };
-}
-
+/**
+ * Onboarding retrait 100 % Badirty.
+ * Pas de composant Stripe Embedded → l'utilisateur ne voit jamais
+ * "type d'entreprise", "site web de l'entreprise", etc.
+ */
 export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
-  const [connectInstance, setConnectInstance] = useState<StripeConnectInstance | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [banner, setBanner] = useState<string | null>(null);
-  /** Incrémenté pour remonter le formulaire (ex. reset forcé) */
-  const [bootKey, setBootKey] = useState(0);
+  const [info, setInfo] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setConnectInstance(null);
-
-        // 1er appel : remplace auto les anciens comptes société
-        // bootKey > 0 → force_reset explicite (bouton "recommencer particulier")
-        const first = await createAccountSession(bootKey > 0);
-        if (cancelled) return;
-
-        if (first.recreated || bootKey > 0) {
-          setBanner('Nouveau parcours particulier — plus de questions société / SIRET.');
-        }
-
-        let cachedSecret: string | null = first.client_secret;
-
-        const instance = loadConnectAndInitialize({
-          publishableKey: first.publishable_key,
-          fetchClientSecret: async () => {
-            if (cachedSecret) {
-              const secret = cachedSecret;
-              cachedSecret = null;
-              return secret;
-            }
-            const next = await createAccountSession(false);
-            return next.client_secret;
-          },
-          locale: 'fr-FR',
-          appearance: BADIRTY_APPEARANCE,
-        });
-
-        setConnectInstance(instance);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Erreur de chargement');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+  const set =
+    (key: keyof FormState) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setForm((f) => ({ ...f, [key]: e.target.value }));
     };
-  }, [bootKey]);
 
-  const handleExit = () => {
-    onCompleted();
-    onClose();
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fetch('/api/stripe/connect/setup-payout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          birthDate: form.birthDate,
+          addressLine1: form.addressLine1,
+          addressLine2: form.addressLine2 || undefined,
+          city: form.city,
+          postalCode: form.postalCode,
+          iban: form.iban,
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        payouts_enabled?: boolean;
+        ready?: boolean;
+      };
+      if (!res.ok) throw new Error(data.error ?? 'Échec de l’enregistrement');
+
+      setInfo(data.message ?? 'Compte lié');
+      onCompleted();
+      // Laisse voir le message succès une fraction de seconde
+      setTimeout(() => onClose(), data.payouts_enabled || data.ready ? 600 : 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -151,86 +114,157 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
           <div className="flex items-center gap-2 min-w-0">
             <GhostLogo size={28} />
             <div className="min-w-0">
-              <p className="font-bold text-sm truncate">Lier mon compte bancaire</p>
-              <p className="text-[11px] text-text-3 truncate">Particulier · identité + RIB</p>
+              <p className="font-bold text-sm truncate">Lier mon RIB</p>
+              <p className="text-[11px] text-text-3 truncate">Particulier · identité + banque</p>
             </div>
           </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="max-w-lg mx-auto">
-          <div className="ui-card p-4 mb-4 flex gap-3 items-start">
+        <form onSubmit={submit} className="max-w-lg mx-auto space-y-4">
+          <div className="ui-card p-4 flex gap-3 items-start">
             <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
             <div className="text-xs text-text-2 space-y-1">
-              <p className="font-semibold text-text">Particulier · retrait vers ton RIB</p>
+              <p className="font-semibold text-text">Comme un virement perso</p>
               <p>
-                Stripe peut afficher un « site web » : c’est ta page vendeur badirty (pas une société).
-                Pour le type : choisis <strong className="text-text">Entrepreneur individuel</strong>
-                {' '}— <strong className="text-text">pas Société</strong>.
+                On te demande uniquement ton identité et ton RIB.
+                Pas de société, pas de SIRET, pas de « type d’entreprise ».
               </p>
             </div>
           </div>
 
-          {banner && (
-            <p className="text-xs text-seller font-semibold mb-3 bg-pink/10 border border-pink/20 rounded-lg px-3 py-2">
-              {banner}
+          <section className="ui-card p-4 space-y-3">
+            <h2 className="font-bold text-sm">Toi</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-text-3">
+                Prénom
+                <input
+                  required
+                  autoComplete="given-name"
+                  value={form.firstName}
+                  onChange={set('firstName')}
+                  className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+                />
+              </label>
+              <label className="block text-xs text-text-3">
+                Nom
+                <input
+                  required
+                  autoComplete="family-name"
+                  value={form.lastName}
+                  onChange={set('lastName')}
+                  className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+                />
+              </label>
+            </div>
+            <label className="block text-xs text-text-3">
+              Date de naissance
+              <input
+                required
+                type="date"
+                autoComplete="bday"
+                value={form.birthDate}
+                onChange={set('birthDate')}
+                className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+              />
+            </label>
+          </section>
+
+          <section className="ui-card p-4 space-y-3">
+            <h2 className="font-bold text-sm">Adresse</h2>
+            <label className="block text-xs text-text-3">
+              Rue
+              <input
+                required
+                autoComplete="address-line1"
+                value={form.addressLine1}
+                onChange={set('addressLine1')}
+                className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+              />
+            </label>
+            <label className="block text-xs text-text-3">
+              Complément (optionnel)
+              <input
+                autoComplete="address-line2"
+                value={form.addressLine2}
+                onChange={set('addressLine2')}
+                className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-text-3">
+                Code postal
+                <input
+                  required
+                  autoComplete="postal-code"
+                  value={form.postalCode}
+                  onChange={set('postalCode')}
+                  className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+                />
+              </label>
+              <label className="block text-xs text-text-3">
+                Ville
+                <input
+                  required
+                  autoComplete="address-level2"
+                  value={form.city}
+                  onChange={set('city')}
+                  className="search-bar mt-1 w-full px-3 py-2.5 text-sm"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="ui-card p-4 space-y-3">
+            <h2 className="font-bold text-sm">Compte bancaire</h2>
+            <label className="block text-xs text-text-3">
+              IBAN
+              <input
+                required
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="FR76 …"
+                value={form.iban}
+                onChange={set('iban')}
+                className="search-bar mt-1 w-full px-3 py-2.5 text-sm font-mono tracking-wide"
+              />
+            </label>
+            <p className="text-[11px] text-text-3">
+              Virement vers ce RIB en 1–3 jours ouvrés après un retrait.
+            </p>
+          </section>
+
+          {error && (
+            <p className="text-sm text-rose font-semibold bg-rose/10 border border-rose/25 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+          {info && (
+            <p className="text-sm text-seller font-semibold bg-pink/10 border border-pink/20 rounded-xl px-3 py-2">
+              {info}
             </p>
           )}
 
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-text-2">
-              <Loader2 className="w-8 h-8 animate-spin text-accent" />
-              <p className="text-sm font-medium">Préparation du formulaire…</p>
-            </div>
-          )}
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-accent w-full py-3.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {busy ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Enregistrement…
+              </>
+            ) : (
+              'Enregistrer mon RIB'
+            )}
+          </button>
 
-          {error && (
-            <div className="ui-card p-4 border border-rose/30 bg-rose/10">
-              <p className="text-sm text-rose font-semibold mb-2">{error}</p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn-ghost w-full py-2.5 text-xs"
-              >
-                Fermer
-              </button>
-            </div>
-          )}
-
-          {!loading && !error && connectInstance && (
-            <div className="ui-card p-3 sm:p-4 min-h-[420px]">
-              <ConnectComponentsProvider connectInstance={connectInstance}>
-                <ConnectAccountOnboarding
-                  onExit={handleExit}
-                  collectionOptions={{
-                    fields: 'currently_due',
-                    futureRequirements: 'omit',
-                  }}
-                  privacyPolicyUrl="https://badirty.fr/privacy"
-                  fullTermsOfServiceUrl="https://badirty.fr/terms"
-                  onLoadError={({ error: loadErr }) => {
-                    setError(loadErr?.message ?? 'Impossible de charger le formulaire');
-                  }}
-                />
-              </ConnectComponentsProvider>
-            </div>
-          )}
-
-          {!loading && (
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => {
-                setBanner(null);
-                setBootKey((k) => k + 1);
-              }}
-              className="mt-4 w-full text-center text-[11px] text-text-3 underline underline-offset-2 hover:text-text-2 py-2"
-            >
-              Toujours des questions société ? Recommencer en particulier
-            </button>
-          )}
-        </div>
+          <p className="text-[10px] text-text-3 text-center leading-relaxed pb-8">
+            En continuant, tu confirmes que les infos sont exactes et que tu acceptes
+            les conditions de paiement nécessaires aux virements (Stripe, pour le compte de badirty).
+          </p>
+        </form>
       </div>
     </div>
   );
