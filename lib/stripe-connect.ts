@@ -9,7 +9,19 @@ import {
   supabaseUrl,
 } from '@/lib/env';
 
-function createIndividualExpressAccount(stripe: Stripe, email?: string) {
+/** Tag metadata pour savoir si le compte a le bon setup "retrait particulier". */
+const ACCOUNT_KIND = 'recipient_individual_v2';
+
+/**
+ * Compte Connect = **personne physique qui reçoit des virements** (retrait wallet).
+ * - business_type: individual (pas company / société)
+ * - service_agreement: recipient (pas "full merchant" — uniquement recevoir des fonds de la plateforme)
+ * - capabilities: transfers only (pas card_payments)
+ *
+ * Note FR : l'UI Stripe peut encore afficher "Entrepreneur individuel" / "type d'entreprise"
+ * dans le libellé légal — ce n'est PAS une SARL. Côté API c'est `individual` + `recipient`.
+ */
+function createRecipientIndividualAccount(stripe: Stripe, email?: string) {
   return stripe.accounts.create({
     type: 'express',
     country: 'FR',
@@ -18,12 +30,17 @@ function createIndividualExpressAccount(stripe: Stripe, email?: string) {
     capabilities: {
       transfers: { requested: true },
     },
+    // Destinataire de fonds plateforme uniquement (pas d'encaissement client sur ce compte)
+    tos_acceptance: {
+      service_agreement: 'recipient',
+    },
     individual: {
       email,
     },
+    // Minimal : évite un profil "boutique" trop chargé
     business_profile: {
-      product_description: 'Ventes entre particuliers sur badirty',
-      mcc: '5931',
+      product_description: 'Retrait de solde badirty (particulier)',
+      mcc: '7299', // Miscellaneous personal services — neutre
       url: siteUrl,
     },
     settings: {
@@ -33,25 +50,50 @@ function createIndividualExpressAccount(stripe: Stripe, email?: string) {
     },
     metadata: {
       platform: 'badirty',
-      account_kind: 'individual',
+      account_kind: ACCOUNT_KIND,
     },
   });
 }
 
+function isRecipientIndividual(account: Stripe.Account): boolean {
+  if (account.business_type !== 'individual') return false;
+  if (account.metadata?.account_kind === ACCOUNT_KIND) return true;
+  // Comptes créés à la main / anciens : regarder l'accord de service
+  const agreement =
+    (account as { controller?: { service_agreement?: string | null } }).controller
+      ?.service_agreement ??
+    (account as { tos_acceptance?: { service_agreement?: string | null } }).tos_acceptance
+      ?.service_agreement;
+  // Si déjà individual + payouts OK, on ne casse pas
+  if (account.payouts_enabled && account.business_type === 'individual') return true;
+  // Sinon on exige le tag v2 (recipient) pour forcer la migration
+  return agreement === 'recipient';
+}
+
 /**
- * Anciens comptes créés avant le fix (souvent company / type vide) :
- * on ne les garde QUE s'ils sont déjà en `individual`.
- * Un compte société avec des infos déjà saisies bloquait le flux — d'où
- * le bug "on me demande encore l'état de ma société".
+ * Recrée si :
+ * - force reset
+ * - type société / vide
+ * - individual mais ancien flux "full merchant" (pas encore recipient v2) et retraits pas actifs
  */
-function shouldRecreateAsIndividual(account: Stripe.Account, forceReset = false): boolean {
+function shouldRecreateAccount(account: Stripe.Account, forceReset = false): boolean {
   if (forceReset) return true;
-  // Déjà particulier → on continue l'onboarding / le compte existant
-  if (account.business_type === 'individual') return false;
-  // Société (ou type inconnu) avec retraits déjà actifs : rare, on laisse
-  if (account.payouts_enabled && account.business_type === 'company') return false;
-  // Sinon : company, null, ou partiellement rempli → nouveau compte particulier
-  return true;
+  if (isRecipientIndividual(account) && account.metadata?.account_kind === ACCOUNT_KIND) {
+    return false;
+  }
+  // Société → toujours recréer (sauf payouts company déjà OK — rare)
+  if (account.business_type === 'company') {
+    return !account.payouts_enabled;
+  }
+  // Individual sans le bon setup, et pas encore opérationnel → recréer en recipient
+  if (account.business_type === 'individual' && !account.payouts_enabled) {
+    return account.metadata?.account_kind !== ACCOUNT_KIND;
+  }
+  // Type inconnu, pas de payouts
+  if (!account.business_type && !account.payouts_enabled) return true;
+  // Déjà payouts_enabled : on laisse (ne bloque pas un user qui retire déjà)
+  if (account.payouts_enabled) return false;
+  return !isRecipientIndividual(account);
 }
 
 export type ResolvedUser = {
@@ -99,13 +141,12 @@ async function persistConnectAccountId(
 }
 
 /**
- * Garantit un compte Connect Express **particulier** lié au profil.
- * Remplace les anciens comptes société (même si des infos avaient été saisies).
+ * Garantit un compte Connect **particulier destinataire** (recipient + individual).
  */
 export async function ensureIndividualConnectAccount(
   user: ResolvedUser,
   opts?: { forceReset?: boolean },
-): Promise<{ accountId: string; stripe: Stripe; recreated: boolean }> {
+): Promise<{ accountId: string; stripe: Stripe; recreated: boolean; businessType: string | null }> {
   if (!stripeSecretKey) {
     throw new Error('Stripe non configuré');
   }
@@ -123,24 +164,24 @@ export async function ensureIndividualConnectAccount(
   let accountId = profile?.stripe_connect_id as string | undefined;
   let recreated = false;
   let previousAccountId: string | undefined;
+  let businessType: string | null = null;
 
   if (accountId) {
     try {
       const existing = await stripe.accounts.retrieve(accountId);
-      if (shouldRecreateAsIndividual(existing, forceReset)) {
+      businessType = existing.business_type ?? null;
+      if (shouldRecreateAccount(existing, forceReset)) {
         previousAccountId = accountId;
         accountId = undefined;
         recreated = true;
-        console.info(
-          '[stripe-connect] recreate as individual',
-          {
-            userId: user.id,
-            previous: previousAccountId,
-            wasType: existing.business_type,
-            details_submitted: existing.details_submitted,
-            forceReset,
-          },
-        );
+        console.info('[stripe-connect] recreate as recipient individual', {
+          userId: user.id,
+          previous: previousAccountId,
+          wasType: existing.business_type,
+          wasKind: existing.metadata?.account_kind,
+          details_submitted: existing.details_submitted,
+          forceReset,
+        });
       }
     } catch {
       previousAccountId = accountId;
@@ -150,19 +191,45 @@ export async function ensureIndividualConnectAccount(
   }
 
   if (!accountId) {
-    const account = await createIndividualExpressAccount(stripe, user.email ?? undefined);
+    let account: Stripe.Account;
+    try {
+      account = await createRecipientIndividualAccount(stripe, user.email ?? undefined);
+    } catch (e) {
+      // Si recipient non dispo sur le compte plateforme (config Dashboard),
+      // fallback individual express classique — toujours pas company.
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn('[stripe-connect] recipient create failed, fallback individual:', msg);
+      account = await stripe.accounts.create({
+        type: 'express',
+        country: 'FR',
+        email: user.email ?? undefined,
+        business_type: 'individual',
+        capabilities: { transfers: { requested: true } },
+        individual: { email: user.email ?? undefined },
+        business_profile: {
+          product_description: 'Retrait de solde badirty (particulier)',
+          mcc: '7299',
+          url: siteUrl,
+        },
+        metadata: {
+          platform: 'badirty',
+          account_kind: ACCOUNT_KIND,
+          recipient_fallback: '1',
+        },
+      });
+    }
     accountId = account.id;
+    businessType = account.business_type ?? 'individual';
     await persistConnectAccountId(user.id, accountId, supabase);
 
-    // Ancien compte orphelin (Express) : on tente une suppression soft, non bloquante
     if (previousAccountId) {
       try {
         await stripe.accounts.del(previousAccountId);
       } catch {
-        /* Express non toujours supprimable — ignore */
+        /* ignore */
       }
     }
   }
 
-  return { accountId, stripe, recreated };
+  return { accountId, stripe, recreated, businessType };
 }

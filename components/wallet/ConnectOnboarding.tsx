@@ -163,10 +163,12 @@ export default function ConnectOnboarding({ onClose, onCompleted }: Props) {
           <div className="ui-card p-4 mb-4 flex gap-3 items-start">
             <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
             <div className="text-xs text-text-2 space-y-1">
-              <p className="font-semibold text-text">Sécurisé · particulier uniquement</p>
+              <p className="font-semibold text-text">Particulier · retrait vers ton RIB</p>
               <p>
-                Quelques infos d’identité et ton RIB. Pas de société, pas de SIRET.
-                Tu restes sur badirty — le virement part ensuite en 1–3 jours ouvrés.
+                Stripe affiche parfois « type d’entreprise » : choisis{' '}
+                <strong className="text-text">Entrepreneur individuel</strong>
+                {' '}(personne physique). <strong className="text-text">Pas Société</strong>, pas Association.
+                C’est le libellé légal Stripe — ce n’est pas une SARL ni un SIRET obligatoire pour démarrer.
               </p>
             </div>
           </div>

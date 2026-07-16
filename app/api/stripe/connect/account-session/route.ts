@@ -39,10 +39,11 @@ export async function POST(request: Request) {
       forceReset,
     });
 
-    // Vérif sécurité : le compte utilisé doit bien être individual
-    const account = await stripe.accounts.retrieve(accountId);
-    if (account.business_type && account.business_type !== 'individual') {
+    let account = await stripe.accounts.retrieve(accountId);
+    // Filet de sécu : jamais de company pour le flux retrait
+    if (account.business_type === 'company') {
       const retry = await ensureIndividualConnectAccount(user, { forceReset: true });
+      account = await retry.stripe.accounts.retrieve(retry.accountId);
       const session = await retry.stripe.accountSessions.create({
         account: retry.accountId,
         components: {
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
         client_secret: session.client_secret,
         publishable_key: stripePublishableKey,
         recreated: true,
-        business_type: 'individual',
+        business_type: account.business_type ?? 'individual',
+        account_kind: account.metadata?.account_kind ?? null,
       });
     }
 
@@ -66,7 +68,6 @@ export async function POST(request: Request) {
         account_onboarding: {
           enabled: true,
           features: {
-            // Collecte RIB dans le composant (Express / particulier)
             external_account_collection: true,
           },
         },
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
       publishable_key: stripePublishableKey,
       recreated,
       business_type: account.business_type ?? 'individual',
+      account_kind: account.metadata?.account_kind ?? null,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur Account Session';

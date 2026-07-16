@@ -26,14 +26,19 @@ export async function GET() {
   const stripe = new Stripe(stripeSecretKey);
   const account = await stripe.accounts.retrieve(connectId);
 
+  const agreement =
+    (account as { controller?: { service_agreement?: string | null } }).controller
+      ?.service_agreement ?? null;
+
   return NextResponse.json({
     connected: true,
     payouts_enabled: account.payouts_enabled ?? false,
     details_submitted: account.details_submitted ?? false,
+    /** Côté API Stripe : `individual` = personne physique, `company` = société */
     business_type: account.business_type ?? null,
-    /** true si l'ancien compte société doit être remplacé au prochain onboarding */
-    needs_individual_reset:
-      account.business_type !== 'individual' && !(account.payouts_enabled && account.business_type === 'company'),
+    service_agreement: agreement,
+    account_kind: account.metadata?.account_kind ?? null,
+    needs_individual_reset: account.business_type === 'company' && !account.payouts_enabled,
     connect_account_id: connectId,
   });
 }
