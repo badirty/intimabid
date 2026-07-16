@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { resolveRequestUser } from '@/lib/stripe-connect';
 import { createClient } from '@/lib/supabase/server';
 import { stripeSecretKey } from '@/lib/env';
 
@@ -17,7 +18,7 @@ function humanizeRequirement(key: string): string {
   return key;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!stripeSecretKey) {
     return NextResponse.json({
       connected: false,
@@ -28,17 +29,34 @@ export async function GET() {
     });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await resolveRequestUser(request);
   if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('stripe_connect_id')
-    .eq('id', user.id)
-    .maybeSingle();
+  const supabase = await createClient();
+  // Lecture profil : cookie user ou service via stripe_connect déjà lié
+  let profile: { stripe_connect_id?: string | null } | null = null;
+  {
+    const { data } = await supabase
+      .from('profiles')
+      .select('stripe_connect_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    profile = data;
+  }
+  // Si RLS bloque sans cookie, retenter via le client déjà auth… sinon le setup-payout a persisté
+  if (!profile?.stripe_connect_id) {
+    const { createClient: createSb } = await import('@supabase/supabase-js');
+    const { supabaseUrl, supabaseAnonKey, supabaseServiceRoleKey } = await import('@/lib/env');
+    if (supabaseServiceRoleKey) {
+      const admin = createSb(supabaseUrl, supabaseServiceRoleKey);
+      const { data } = await admin
+        .from('profiles')
+        .select('stripe_connect_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      profile = data;
+    }
+  }
 
   const connectId = profile?.stripe_connect_id as string | undefined;
   if (!connectId) {

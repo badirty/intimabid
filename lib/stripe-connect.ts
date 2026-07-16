@@ -170,6 +170,7 @@ export async function setupPayoutWithIdentity(
       } else {
         // Mise à jour RIB / identité sur compte déjà bon
         await stripe.accounts.update(previousId, {
+          tos_acceptance: { date: tosDate, ip },
           individual: {
             first_name: firstName,
             last_name: lastName,
@@ -268,7 +269,7 @@ export async function setupPayoutWithIdentity(
     const msg = e instanceof Error ? e.message : String(e);
     console.warn('[stripe-connect] custom create failed, try express prefilled:', msg);
 
-    // Fallback Express prérempli (ToS accepté pendant/via nos données, pas recipient)
+    // Fallback Express prérempli
     account = await stripe.accounts.create({
       type: 'express',
       country: 'FR',
@@ -288,6 +289,18 @@ export async function setupPayoutWithIdentity(
         custom_fallback: 'express',
       },
     });
+  }
+
+  // Filet ToS : requis pour activer les payouts (Custom). Sur Express, Stripe peut ignorer.
+  try {
+    await stripe.accounts.update(account.id, {
+      tos_acceptance: { date: tosDate, ip },
+    });
+  } catch (e) {
+    console.warn(
+      '[stripe-connect] tos_acceptance update skipped:',
+      e instanceof Error ? e.message : e,
+    );
   }
 
   await persistConnectAccountId(user.id, account.id, supabase);
