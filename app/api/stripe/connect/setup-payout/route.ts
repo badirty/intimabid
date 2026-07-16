@@ -52,13 +52,15 @@ export async function POST(request: Request) {
       ok: true,
       account_id: result.accountId,
       payouts_enabled: result.payoutsEnabled,
-      ready,
+      ready: ready || result.payoutsEnabled,
       currently_due: result.currentlyDue,
       message: result.payoutsEnabled
         ? 'Compte bancaire lié — tu peux retirer.'
-        : result.currentlyDue.some((r) => r.includes('verification'))
-          ? 'Infos enregistrées. Une vérification d’identité peut encore être demandée par Stripe.'
-          : 'Infos enregistrées. Les retraits s’activent dès validation Stripe (souvent immédiat).',
+        : result.currentlyDue.some((r) => r.includes('tos_acceptance'))
+          ? 'Infos enregistrées, mais acceptation des conditions Stripe encore en attente (compte limité).'
+          : result.currentlyDue.some((r) => r.includes('verification'))
+            ? 'Infos enregistrées. Une vérification d’identité peut encore être demandée par Stripe.'
+            : 'Infos enregistrées. Les retraits s’activent dès validation Stripe (souvent immédiat).',
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur configuration retrait';

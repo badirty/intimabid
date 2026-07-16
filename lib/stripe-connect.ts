@@ -237,15 +237,21 @@ export async function setupPayoutWithIdentity(
   };
 
   let account: Stripe.Account;
+  let createPath = 'controller_custom';
 
+  // Compte "application-managed" (ex-Custom) : la plateforme peut poser le ToS.
+  // Express ne le permet PAS → currently_due reste bloqué sur tos_acceptance.
   try {
-    // Custom = l'UI Stripe "entreprise" n'est jamais montrée à l'utilisateur.
-    // ToS full (défaut) — recipient interdit pour plateforme FR → compte FR.
     account = await stripe.accounts.create({
-      type: 'custom',
       country: 'FR',
       email: user.email,
       business_type: 'individual',
+      controller: {
+        fees: { payer: 'application' },
+        losses: { payments: 'application' },
+        stripe_dashboard: { type: 'none' },
+        requirement_collection: 'application',
+      },
       capabilities: {
         transfers: { requested: true },
       },
@@ -263,38 +269,65 @@ export async function setupPayoutWithIdentity(
         platform: 'badirty',
         account_kind: ACCOUNT_KIND,
         user_id: user.id,
+        create_path: createPath,
       },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn('[stripe-connect] custom create failed, try express prefilled:', msg);
-
-    // Fallback Express prérempli
-    account = await stripe.accounts.create({
-      type: 'express',
-      country: 'FR',
-      email: user.email,
-      business_type: 'individual',
-      capabilities: { transfers: { requested: true } },
-      business_profile: businessProfile,
-      individual,
-      external_account: externalAccount,
-      settings: {
-        payouts: { schedule: { interval: 'daily' } },
-      },
-      metadata: {
-        platform: 'badirty',
-        account_kind: ACCOUNT_KIND,
-        user_id: user.id,
-        custom_fallback: 'express',
-      },
-    });
+  } catch (e1) {
+    const msg1 = e1 instanceof Error ? e1.message : String(e1);
+    console.warn('[stripe-connect] controller create failed, try type=custom:', msg1);
+    createPath = 'type_custom';
+    try {
+      account = await stripe.accounts.create({
+        type: 'custom',
+        country: 'FR',
+        email: user.email,
+        business_type: 'individual',
+        capabilities: { transfers: { requested: true } },
+        tos_acceptance: { date: tosDate, ip },
+        business_profile: businessProfile,
+        individual,
+        external_account: externalAccount,
+        settings: { payouts: { schedule: { interval: 'daily' } } },
+        metadata: {
+          platform: 'badirty',
+          account_kind: ACCOUNT_KIND,
+          user_id: user.id,
+          create_path: createPath,
+        },
+      });
+    } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      // Dernier recours Express : ToS non posable par la plateforme → compte Limité
+      console.error('[stripe-connect] custom paths failed, express fallback:', msg2);
+      createPath = 'express_fallback';
+      account = await stripe.accounts.create({
+        type: 'express',
+        country: 'FR',
+        email: user.email,
+        business_type: 'individual',
+        capabilities: { transfers: { requested: true } },
+        business_profile: businessProfile,
+        individual,
+        external_account: externalAccount,
+        settings: { payouts: { schedule: { interval: 'daily' } } },
+        metadata: {
+          platform: 'badirty',
+          account_kind: ACCOUNT_KIND,
+          user_id: user.id,
+          create_path: createPath,
+          custom_error: msg2.slice(0, 200),
+        },
+      });
+    }
   }
 
-  // Filet ToS : requis pour activer les payouts (Custom). Sur Express, Stripe peut ignorer.
   try {
     await stripe.accounts.update(account.id, {
       tos_acceptance: { date: tosDate, ip },
+      metadata: {
+        ...account.metadata,
+        create_path: createPath,
+      },
     });
   } catch (e) {
     console.warn(
