@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/close-expired-auctions",
+      "path": "/api/jobs/close-expired-auctions",
       "schedule": "*/5 * * * *"
     }
   ]
