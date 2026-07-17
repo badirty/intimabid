@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/admin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('Authorization');
   const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : null;
