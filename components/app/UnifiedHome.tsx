@@ -295,30 +295,31 @@ export default function UnifiedHome({
   const sellerQuery = search.trim();
 
   return (
-    <div className="animate-slide-up relative">
-      <div className="header-dark px-5 pt-2 pb-0">
-        <div className="flex items-center justify-between py-2">
-          <h2 className="text-xs uppercase tracking-widest text-white/40 font-bold">
-            {{
-              live: 'Enchères en direct', favorites: 'Mes favoris', selling: 'Mes ventes', ended: 'Terminées',
-              mybids: 'Mes offres actives', mywins: 'Mes gains', mylost: 'Perdues',
-            }[tab]}
-          </h2>
-          <button type="button" onClick={() => load()} className="text-[10px] text-accent font-bold">↻ Actualiser</button>
-        </div>
-        <div className="tab-bar overflow-x-auto flex-nowrap">
-          {(['live', 'favorites', 'mybids', 'mywins', 'mylost', 'selling', 'ended'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`shrink-0 ${tab === t ? 'active' : ''}`}>
+    <>
+      <div className="animate-slide-up relative">
+        <div className="header-dark px-5 pt-2 pb-0">
+          <div className="flex items-center justify-between py-2">
+            <h2 className="text-xs uppercase tracking-widest text-white/40 font-bold">
               {{
-                live: 'Live', favorites: 'Favoris', selling: 'Ventes', ended: 'Finies',
-                mybids: 'Offres', mywins: 'Gains', mylost: 'Perdues',
-              }[t]}
-            </button>
-          ))}
+                live: 'Enchères en direct', favorites: 'Mes favoris', selling: 'Mes ventes', ended: 'Terminées',
+                mybids: 'Mes offres actives', mywins: 'Mes gains', mylost: 'Perdues',
+              }[tab]}
+            </h2>
+            <button type="button" onClick={() => load()} className="text-[10px] text-accent font-bold">↻ Actualiser</button>
+          </div>
+          <div className="tab-bar overflow-x-auto flex-nowrap">
+            {(['live', 'favorites', 'mybids', 'mywins', 'mylost', 'selling', 'ended'] as const).map((t) => (
+              <button key={t} onClick={() => setTab(t)} className={`shrink-0 ${tab === t ? 'active' : ''}`}>
+                {{
+                  live: 'Live', favorites: 'Favoris', selling: 'Ventes', ended: 'Finies',
+                  mybids: 'Offres', mywins: 'Gains', mylost: 'Perdues',
+                }[t]}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4">
         <div className="flex gap-2 p-1 rounded-xl bg-white/5 border border-white/8">
           {([
             ['items', 'Articles'],
@@ -560,6 +561,7 @@ export default function UnifiedHome({
             showEnded />
         ))}
       </div>
+      </div>
 
       {!showCreate && (
         <button
@@ -780,7 +782,7 @@ export default function UnifiedHome({
           onSubmit={(cents) => handleBid(bidModal, cents)}
           onWalletNeeded={onWalletNeeded} />
       )}
-    </div>
+    </>
   );
 }
 

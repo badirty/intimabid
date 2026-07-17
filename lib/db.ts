@@ -164,7 +164,7 @@ async function enrichAuctions(rows: Record<string, unknown>[], userId?: string):
   }
 
   let favSet = new Set<string>();
-  let bidCounts: Record<string, number> = {};
+  const bidCounts: Record<string, number> = {};
 
   if (userId && ids.length) {
     const { data: favs } = await supabase.from('favorites').select('auction_id').eq('user_id', userId).in('auction_id', ids);
