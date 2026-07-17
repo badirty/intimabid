@@ -10,6 +10,8 @@ import type { AdminStats, AdminReport, AdminUser, AdminAuction, AdminWithdrawal 
 
 type Tab = 'stats' | 'reports' | 'users' | 'auctions' | 'withdrawals';
 
+type RouteError = { route: string; status: number; message: string };
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [auctions, setAuctions] = useState<AdminAuction[]>([]);
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
+  const [errors, setErrors] = useState<RouteError[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,25 +47,57 @@ export default function AdminDashboard() {
   const loadAll = async () => {
     setLoading(true);
     setError(null);
+    setErrors([]);
     try {
-      const [statsRes, reportsRes, usersRes, auctionsRes, withdrawalsRes] = await Promise.all([
-        fetch('/api/admin/stats'),
-        fetch('/api/admin/reports'),
-        fetch('/api/admin/users'),
-        fetch('/api/admin/auctions'),
-        fetch('/api/admin/withdrawals'),
-      ]);
+      const routes = [
+        { key: 'stats', url: '/api/admin/stats' },
+        { key: 'reports', url: '/api/admin/reports' },
+        { key: 'users', url: '/api/admin/users' },
+        { key: 'auctions', url: '/api/admin/auctions' },
+        { key: 'withdrawals', url: '/api/admin/withdrawals' },
+      ] as const;
 
-      const responses = [statsRes, reportsRes, usersRes, auctionsRes, withdrawalsRes];
-      if (responses.some((r) => !r.ok)) {
-        throw new Error('Erreur lors du chargement des données admin');
+      const responses = await Promise.all(
+        routes.map(async (r) => {
+          const res = await fetch(r.url);
+          if (!res.ok) {
+            const text = await res.text().catch(() => 'Erreur inconnue');
+            let message: string;
+            try {
+              const json = JSON.parse(text);
+              message = json.error ?? json.message ?? text;
+            } catch {
+              message = text;
+            }
+            return { key: r.key, ok: false, status: res.status, message };
+          }
+          const data = await res.json().catch(() => null);
+          return { key: r.key, ok: true, status: res.status, data };
+        }),
+      );
+
+      const routeErrors: RouteError[] = [];
+      for (const r of responses) {
+        if (!r.ok) {
+          routeErrors.push({ route: r.key, status: r.status, message: r.message ?? 'Erreur inconnue' });
+        }
+      }
+      setErrors(routeErrors);
+
+      if (routeErrors.length > 0) {
+        setError(
+          `Erreur sur ${routeErrors.length} route(s) : ${routeErrors
+            .map((e) => `${e.route} (${e.status})`)
+            .join(', ')}`,
+        );
       }
 
-      setStats(await statsRes.json());
-      setReports(await reportsRes.json());
-      setUsers(await usersRes.json());
-      setAuctions(await auctionsRes.json());
-      setWithdrawals(await withdrawalsRes.json());
+      const find = (key: string) => responses.find((r) => r.key === key)?.data;
+      setStats(find('stats') ?? null);
+      setReports(find('reports') ?? []);
+      setUsers(find('users') ?? []);
+      setAuctions(find('auctions') ?? []);
+      setWithdrawals(find('withdrawals') ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
     } finally {
@@ -145,7 +180,17 @@ export default function AdminDashboard() {
 
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-rose/10 border border-rose/30 text-rose text-sm">
-            {error}
+            <p className="font-bold">{error}</p>
+            {errors.length > 0 && (
+              <ul className="mt-2 space-y-1 text-xs">
+                {errors.map((e) => (
+                  <li key={e.route}>
+                    <span className="font-bold uppercase">{e.route}</span>{' '}
+                    <span className="opacity-80">(HTTP {e.status})</span>: {e.message}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
