@@ -30,13 +30,19 @@ SET balance_cents = 0
 FROM demo_users d
 WHERE w.user_id = d.user_id;
 
--- 4. Supprime les transactions de type topup_demo (elles ne sont plus utilisées)
-DELETE FROM public.wallet_transactions WHERE type = 'topup_demo';
-
--- 5. Supprime le type topup_demo de la contrainte d'énumération
+-- 4. Supprime la contrainte actuelle pour pouvoir nettoyer sans erreur
 ALTER TABLE public.wallet_transactions
   DROP CONSTRAINT IF EXISTS wallet_transactions_type_check;
 
+-- 5. Supprime les transactions de type topup_demo (elles ne sont plus utilisées)
+DELETE FROM public.wallet_transactions WHERE type = 'topup_demo';
+
+-- 6. Sécurité : si un type inattendu reste présent, on le marche comme 'purchase'
+UPDATE public.wallet_transactions
+SET type = 'purchase'
+WHERE type NOT IN ('topup_stripe', 'bid_hold', 'bid_refund', 'sale_credit', 'withdrawal', 'purchase');
+
+-- 7. Recrée la contrainte sans topup_demo
 ALTER TABLE public.wallet_transactions
   ADD CONSTRAINT wallet_transactions_type_check
   CHECK (type IN ('topup_stripe', 'bid_hold', 'bid_refund', 'sale_credit', 'withdrawal', 'purchase'));
