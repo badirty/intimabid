@@ -624,6 +624,11 @@ export async function hasConfirmedAge(userId: string): Promise<boolean> {
   return !!data?.age_confirmed_at;
 }
 
+export async function isUserSuspended(userId: string): Promise<boolean> {
+  const { data } = await supabase.from('profiles').select('suspended_at').eq('id', userId).maybeSingle();
+  return !!data?.suspended_at;
+}
+
 export async function submitReport(auctionId: string | null, reason: string, details?: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non connecté');

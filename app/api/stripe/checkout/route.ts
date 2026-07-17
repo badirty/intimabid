@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { siteUrl, stripeConfigStatus, stripeSecretKey, supabaseAnonKey, supabaseUrl } from '@/lib/env';
+import { assertNotSuspended, createAdminClient } from '@/lib/admin';
 
 async function resolveUser(request: Request) {
   const supabase = await createServerSupabase();
@@ -34,6 +35,13 @@ export async function POST(request: Request) {
     const user = await resolveUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Session expirée — reconnecte-toi.' }, { status: 401 });
+    }
+
+    try {
+      const adminClient = createAdminClient();
+      await assertNotSuspended(adminClient, user.id);
+    } catch {
+      return NextResponse.json({ error: 'Compte suspendu' }, { status: 403 });
     }
 
     const { amount_cents } = await request.json();

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { LogOut, Wallet, Store, Pencil, Check, X, Package, Mail } from 'lucide-react';
+import { LogOut, Wallet, Store, Pencil, Check, X, Package, Mail, Shield } from 'lucide-react';
 import { centsToEuros } from '@/lib/format';
 import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName, updateProfileSettings } from '@/lib/db';
 import { resolveProfileFromUser } from '@/lib/profile';
@@ -36,8 +36,16 @@ export default function ProfileScreen({
   const [draftBio, setDraftBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const displayName = profileName ?? oauth.display_name;
+
+  useEffect(() => {
+    fetch('/api/admin/me')
+      .then((r) => r.json())
+      .then((data) => setIsAdmin(!!data.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   useEffect(() => {
     fetchProfile(userId).then((p) => {
@@ -219,7 +227,7 @@ export default function ProfileScreen({
         <button
           type="button"
           onClick={openMyShop}
-          className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:border-accent/30 transition-all"
+          className="ui-card w-full p-4 mb-3 flex items-center gap-3 hover:border-accent/30 transition-all"
         >
           <div className="w-10 h-10 rounded-xl bg-pink/10 flex items-center justify-center">
             <Store className="w-5 h-5 text-pink" />
@@ -230,6 +238,22 @@ export default function ProfileScreen({
           </div>
           <span className="text-text-3">→</span>
         </button>
+      )}
+
+      {isAdmin && (
+        <a
+          href="/admin"
+          className="ui-card w-full p-4 mb-4 flex items-center gap-3 hover:border-accent/30 transition-all"
+        >
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <Shield className="w-5 h-5 text-accent" />
+          </div>
+          <div className="text-left flex-1">
+            <p className="font-bold text-sm">Administration</p>
+            <p className="text-text-3 text-xs mt-0.5">Dashboard modération</p>
+          </div>
+          <span className="text-text-3">→</span>
+        </a>
       )}
 
       <div className="grid grid-cols-2 gap-3 mb-4">

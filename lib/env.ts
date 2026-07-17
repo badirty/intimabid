@@ -52,6 +52,8 @@ export const supabaseServiceRoleKey = readEnv('SUPABASE_SERVICE_ROLE_KEY');
 
 export const siteUrl = readEnv('NEXT_PUBLIC_SITE_URL') ?? 'https://badirty.fr';
 
+export const adminEmail = readEnv('ADMIN_EMAIL') ?? 'admin@badirty.fr';
+
 /** Recharge démo + bonus inscription — uniquement si explicitement activé (local). */
 export function isDemoWalletEnabled(): boolean {
   return readEnv('DEMO_WALLET_ENABLED', 'NEXT_PUBLIC_DEMO_WALLET_ENABLED') === 'true';
@@ -70,4 +72,9 @@ export function stripeConfigStatus(): { configured: boolean; missing: string[] }
 
 export function isStripeConfigured(): boolean {
   return stripeConfigStatus().configured;
+}
+
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return email.toLowerCase().trim() === adminEmail.toLowerCase().trim();
 }

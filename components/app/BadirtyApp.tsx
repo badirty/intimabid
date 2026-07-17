@@ -9,7 +9,8 @@ import LandingPage from '@/components/landing/LandingPage';
 import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
 import AgeGate from '@/components/onboarding/AgeGate';
 import AppShell from '@/components/app/AppShell';
-import { ensureUserBootstrap, hasConfirmedAge } from '@/lib/db';
+import { ensureUserBootstrap, hasConfirmedAge, isUserSuspended } from '@/lib/db';
+import { AlertCircle, LogOut } from 'lucide-react';
 import GhostLogo from '@/components/brand/GhostLogo';
 
 type UnauthView = 'landing' | 'login' | 'signup';
@@ -26,14 +27,23 @@ export default function BadirtyApp({
   const [ageOk, setAgeOk] = useState(false);
   const [loading, setLoading] = useState(true);
   const [unauthView, setUnauthView] = useState<UnauthView>('landing');
+  const [isSuspended, setIsSuspended] = useState(false);
 
   const syncUser = async (sessionUser: User | null) => {
     setUser(sessionUser);
     if (sessionUser) {
+      const suspended = await isUserSuspended(sessionUser.id).catch(() => false);
+      setIsSuspended(suspended);
+      if (suspended) {
+        setOnboarded(false);
+        setAgeOk(false);
+        return;
+      }
       setOnboarded(hasCompletedOnboarding(sessionUser));
       await ensureUserBootstrap(sessionUser.id, sessionUser.email, sessionUser).catch(() => {});
       setAgeOk(await hasConfirmedAge(sessionUser.id).catch(() => false));
     } else {
+      setIsSuspended(false);
       setOnboarded(false);
       setAgeOk(false);
     }
@@ -95,6 +105,32 @@ export default function BadirtyApp({
           supabase.auth.getSession().then(({ data }) => syncUser(data.session?.user ?? null))
         }
       />
+    );
+  }
+
+  if (isSuspended) {
+    return (
+      <div className="app-shell">
+        <div className="flex flex-col items-center justify-center p-6 flex-1 min-h-dvh text-center">
+          <div className="w-16 h-16 rounded-full bg-rose/10 flex items-center justify-center mb-6">
+            <AlertCircle className="w-8 h-8 text-rose" />
+          </div>
+          <h1 className="text-xl font-bold text-text mb-2">Compte suspendu</h1>
+          <p className="text-text-2 mb-2 text-sm max-w-sm">
+            L'accès à ton compte a été restreint. Si tu penses qu'il s'agit d'une erreur, contacte le support.
+          </p>
+          <a href="/contact" className="text-accent text-sm hover:underline mb-8">
+            Contact
+          </a>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="btn-ghost flex items-center gap-2 px-6 py-3"
+          >
+            <LogOut className="w-4 h-4" /> Se déconnecter
+          </button>
+        </div>
+      </div>
     );
   }
 

@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
 import { executeStripeWithdrawal, rollbackWithdrawal } from '@/lib/stripe-withdraw';
 import { stripeSecretKey } from '@/lib/env';
+import { assertNotSuspended, createAdminClient } from '@/lib/admin';
 
 export async function POST(request: Request) {
   if (!stripeSecretKey) {
@@ -12,6 +13,13 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+
+  try {
+    const adminClient = createAdminClient();
+    await assertNotSuspended(adminClient, user.id);
+  } catch {
+    return NextResponse.json({ error: 'Compte suspendu' }, { status: 403 });
+  }
 
   const { amount_cents } = await request.json();
   if (!amount_cents || amount_cents < 100) {

@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { assertNotSuspended, createAdminClient } from '@/lib/admin';
 
 export async function POST() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+
+  try {
+    const adminClient = createAdminClient();
+    await assertNotSuspended(adminClient, user.id);
+  } catch {
+    return NextResponse.json({ error: 'Compte suspendu' }, { status: 403 });
+  }
 
   const { data, error } = await supabase.rpc('cancel_pending_withdrawal');
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
