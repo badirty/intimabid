@@ -54,13 +54,8 @@ export const siteUrl = readEnv('NEXT_PUBLIC_SITE_URL') ?? 'https://badirty.fr';
 
 export const adminEmail = readEnv('ADMIN_EMAIL') ?? 'admin@badirty.fr';
 
-/** Recharge démo + bonus inscription — uniquement si explicitement activé (local). */
-export function isDemoWalletEnabled(): boolean {
-  return readEnv('DEMO_WALLET_ENABLED', 'NEXT_PUBLIC_DEMO_WALLET_ENABLED') === 'true';
-}
-
 export function signupBonusCents(): number {
-  return isDemoWalletEnabled() ? 2000 : 0;
+  return 0;
 }
 
 export function stripeConfigStatus(): { configured: boolean; missing: string[] } {

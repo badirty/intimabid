@@ -5,7 +5,6 @@ import { ArrowLeft, CreditCard, Sparkles } from 'lucide-react';
 import { centsToEuros, eurosToCents } from '@/lib/format';
 import {
   cancelPendingWithdrawal,
-  demoTopup,
   fetchWallet,
   fetchWalletTransactions,
   isDbReady,
@@ -20,7 +19,6 @@ import ConnectOnboarding from '@/components/wallet/ConnectOnboarding';
 
 type AppConfig = {
   stripe: boolean;
-  demoWallet: boolean;
   stripeMissing?: string[];
 };
 
@@ -31,10 +29,10 @@ async function fetchAppConfig(): Promise<AppConfig> {
   const legacy = await fetch('/api/stripe/status', { cache: 'no-store' });
   if (legacy.ok) {
     const d = await legacy.json();
-    return { stripe: !!d.enabled, demoWallet: false };
+    return { stripe: !!d.enabled };
   }
 
-  return { stripe: false, demoWallet: false };
+  return { stripe: false };
 }
 
 const MIN_TOPUP_EUR = 0.5;
@@ -106,7 +104,6 @@ export default function WalletScreen({
   }, []);
 
   const stripeEnabled = !!config?.stripe;
-  const demoEnabled = !!config?.demoWallet;
   const configLoading = config === null;
 
   const load = useCallback(async (opts?: { initial?: boolean }) => {
@@ -135,7 +132,7 @@ export default function WalletScreen({
   useEffect(() => {
     fetchAppConfig()
       .then(setConfig)
-      .catch(() => setConfig({ stripe: false, demoWallet: false }));
+      .catch(() => setConfig({ stripe: false }));
   }, []);
 
   useEffect(() => {
@@ -213,7 +210,7 @@ export default function WalletScreen({
     })();
   }, [userId, load, onBalanceChange, refreshConnectStatus]);
 
-  const recharge = async (mode: 'demo' | 'stripe') => {
+  const recharge = async () => {
     const cents = eurosToCents(topupEuros);
     if (Number.isNaN(cents) || cents < 50) {
       setError('Minimum 0,50 €');
@@ -226,21 +223,8 @@ export default function WalletScreen({
     setBusy(true);
     setError(null);
     setMsg(null);
-    const prevBalance = balanceCents;
 
     try {
-      if (mode === 'demo') {
-        await demoTopup(cents, userId);
-        const w = await load();
-        const newBalance = w?.balance_cents ?? 0;
-        if (newBalance <= prevBalance) {
-          throw new Error('Recharge démo refusée (désactivée en production).');
-        }
-        setMsg(`+${centsToEuros(cents)} € ajoutés ✨`);
-        onBalanceChange?.();
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('Session expirée — déconnecte-toi puis reconnecte-toi.');
@@ -279,7 +263,7 @@ export default function WalletScreen({
     }
   };
 
-  const canRecharge = stripeEnabled || demoEnabled;
+  const canRecharge = stripeEnabled;
   const displayBalance = initialLoading ? '...' : centsToEuros(balanceCents);
 
   return (
@@ -415,7 +399,7 @@ export default function WalletScreen({
         {stripeEnabled && (
           <button
             type="button"
-            onClick={() => recharge('stripe')}
+            onClick={() => recharge()}
             disabled={busy || configLoading}
             className="btn-buyer w-full py-3.5 text-sm flex items-center justify-center gap-2 mb-2 disabled:opacity-60"
           >
@@ -424,20 +408,7 @@ export default function WalletScreen({
           </button>
         )}
 
-        {demoEnabled && (
-          <button
-            type="button"
-            onClick={() => recharge('demo')}
-            disabled={busy || configLoading}
-            className={`w-full py-3.5 text-sm rounded-xl font-bold border disabled:opacity-60 ${
-              stripeEnabled
-                ? 'border-border text-text-2 hover:bg-card-muted'
-                : 'btn-buyer'
-            }`}
-          >
-            {busy ? 'Recharge…' : stripeEnabled ? 'Recharger (démo test)' : 'Recharger'}
-          </button>
-        )}
+
       </div>
 
       <div className="ui-card p-5 mb-3">

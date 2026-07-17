@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { isDemoWalletEnabled, signupBonusCents } from '@/lib/env';
+import { signupBonusCents } from '@/lib/env';
 import { resolveProfileFromUser } from '@/lib/profile';
 import type {
   Auction, Notification, Order, Profile, SellerSearchResult, UserAddress, UserStats, Wallet, WalletTransaction,
@@ -350,42 +350,7 @@ export async function isDbReady(): Promise<boolean> {
   return !error || error.code !== '42P01';
 }
 
-export async function demoTopup(amountCents = 5000, userId?: string) {
-  if (!isDemoWalletEnabled()) {
-    throw new Error('Recharge démo désactivée. Utilise le paiement par carte.');
-  }
-  const uid = userId ?? (await supabase.auth.getUser()).data.user?.id;
-  if (!uid) throw new Error('Non connecté');
 
-  const before = (await fetchWallet(uid))?.balance_cents ?? 0;
-  const { error } = await supabase.rpc('demo_wallet_topup', { p_amount_cents: amountCents });
-  if (!error) {
-    const after = (await fetchWallet(uid))?.balance_cents ?? 0;
-    if (after > before) return;
-  }
-
-  await ensureUserBootstrap(uid);
-  const wallet = await fetchWallet(uid);
-  const newBalance = (wallet?.balance_cents ?? 0) + amountCents;
-
-  const { error: upErr } = await supabase
-    .from('wallets')
-    .upsert({ user_id: uid, balance_cents: newBalance, pending_cents: wallet?.pending_cents ?? 0 });
-
-  if (upErr) {
-    if (upErr.code === '42P01') {
-      throw new Error('Base de données non configurée. Exécute supabase/migrations/001_schema.sql dans Supabase.');
-    }
-    throw new Error(upErr.message);
-  }
-
-  await supabase.from('wallet_transactions').insert({
-    user_id: uid,
-    type: 'topup_demo',
-    amount_cents: amountCents,
-    description: 'Recharge démo',
-  }).then(() => {});
-}
 
 export async function creditWallet(userId: string, amountCents: number, type: 'topup_stripe' | 'topup_demo' = 'topup_stripe') {
   await ensureUserBootstrap(userId);

@@ -7,6 +7,5 @@ export {
   supabaseServiceRoleKey,
   siteUrl,
   isStripeConfigured,
-  isDemoWalletEnabled,
   signupBonusCents,
 } from '@/lib/env';
