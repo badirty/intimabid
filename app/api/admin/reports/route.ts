@@ -13,7 +13,7 @@ export async function GET() {
     const admin = createAdminClient();
     const { data: reports, error } = await admin
       .from('reports')
-      .select('*, reporter:profiles!reports_reporter_id_fkey(display_name)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -21,9 +21,29 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const reporterIds = [...new Set((reports ?? []).map((r) => r.reporter_id).filter(Boolean))];
+    let profiles: { id: string; display_name: string | null }[] = [];
+    if (reporterIds.length > 0) {
+      const { data, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', reporterIds);
+      if (profilesError) {
+        return NextResponse.json({ error: profilesError.message }, { status: 500 });
+      }
+      profiles = data ?? [];
+    }
+
     const { data: authUsers, error: authError } = await admin.auth.admin.listUsers();
     if (authError) {
       return NextResponse.json({ error: `auth.listUsers: ${authError.message}` }, { status: 500 });
+    }
+
+    const profileMap = new Map<string, string>();
+    if (profiles) {
+      for (const p of profiles) {
+        if (p.display_name) profileMap.set(p.id, p.display_name);
+      }
     }
 
     const emailMap = new Map<string, string>();
@@ -37,7 +57,7 @@ export async function GET() {
       id: r.id,
       reporter_id: r.reporter_id,
       reporter_email: emailMap.get(r.reporter_id) ?? null,
-      reporter_name: (r.reporter as { display_name?: string | null } | null)?.display_name ?? null,
+      reporter_name: profileMap.get(r.reporter_id) ?? null,
       auction_id: r.auction_id,
       reason: r.reason,
       details: r.details,

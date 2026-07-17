@@ -63,6 +63,7 @@ export type AdminAuction = {
   id: string;
   seller_id: string;
   seller_email: string | null;
+  seller_name: string | null;
   title: string;
   status: string;
   current_price_cents: number;

@@ -13,7 +13,7 @@ export async function GET() {
     const admin = createAdminClient();
     const { data: profiles, error } = await admin
       .from('profiles')
-      .select('*, wallets(balance_cents)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
 
@@ -21,9 +21,29 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const userIds = [...new Set((profiles ?? []).map((p) => p.id).filter(Boolean))];
+    let wallets: { user_id: string; balance_cents: number }[] = [];
+    if (userIds.length > 0) {
+      const { data, error: walletsError } = await admin
+        .from('wallets')
+        .select('user_id, balance_cents')
+        .in('user_id', userIds);
+      if (walletsError) {
+        return NextResponse.json({ error: walletsError.message }, { status: 500 });
+      }
+      wallets = data ?? [];
+    }
+
     const { data: authUsers, error: authError } = await admin.auth.admin.listUsers();
     if (authError) {
       return NextResponse.json({ error: `auth.listUsers: ${authError.message}` }, { status: 500 });
+    }
+
+    const walletMap = new Map<string, number>();
+    if (wallets) {
+      for (const w of wallets) {
+        walletMap.set(w.user_id, w.balance_cents ?? 0);
+      }
     }
 
     const emailMap = new Map<string, string>();
@@ -39,7 +59,7 @@ export async function GET() {
       display_name: p.display_name,
       created_at: p.created_at,
       suspended_at: p.suspended_at,
-      balance_cents: (p.wallets as { balance_cents?: number } | null)?.balance_cents ?? 0,
+      balance_cents: walletMap.get(p.id) ?? 0,
     }));
 
     return NextResponse.json(mapped);

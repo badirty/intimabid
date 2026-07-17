@@ -13,7 +13,7 @@ export async function GET() {
     const admin = createAdminClient();
     const { data: auctions, error } = await admin
       .from('auctions')
-      .select('*, seller:profiles!auctions_seller_id_fkey(display_name)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
 
@@ -21,9 +21,29 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const sellerIds = [...new Set((auctions ?? []).map((a) => a.seller_id).filter(Boolean))];
+    let profiles: { id: string; display_name: string | null }[] = [];
+    if (sellerIds.length > 0) {
+      const { data, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', sellerIds);
+      if (profilesError) {
+        return NextResponse.json({ error: profilesError.message }, { status: 500 });
+      }
+      profiles = data ?? [];
+    }
+
     const { data: authUsers, error: authError } = await admin.auth.admin.listUsers();
     if (authError) {
       return NextResponse.json({ error: `auth.listUsers: ${authError.message}` }, { status: 500 });
+    }
+
+    const profileMap = new Map<string, string>();
+    if (profiles) {
+      for (const p of profiles) {
+        if (p.display_name) profileMap.set(p.id, p.display_name);
+      }
     }
 
     const emailMap = new Map<string, string>();
@@ -37,6 +57,7 @@ export async function GET() {
       id: a.id,
       seller_id: a.seller_id,
       seller_email: emailMap.get(a.seller_id) ?? null,
+      seller_name: profileMap.get(a.seller_id) ?? null,
       title: a.title,
       status: a.status,
       current_price_cents: a.current_price_cents,
