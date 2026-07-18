@@ -39,9 +39,14 @@ export default function OrdersScreen({ userId, mode }: { userId: string; mode: '
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = mode === 'buyer' ? await fetchBuyerOrders(userId) : await fetchSellerOrders(userId);
-    setOrders(data);
-    setLoading(false);
+    try {
+      const data = mode === 'buyer' ? await fetchBuyerOrders(userId) : await fetchSellerOrders(userId);
+      setOrders(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur chargement commandes');
+    } finally {
+      setLoading(false);
+    }
   }, [userId, mode]);
 
   useEffect(() => { load(); }, [load]);

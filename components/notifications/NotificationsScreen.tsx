@@ -33,8 +33,11 @@ export default function NotificationsScreen({
 
   const load = useCallback(async () => {
     setLoading(true);
-    setItems(await fetchNotifications(userId));
-    setLoading(false);
+    try {
+      setItems(await fetchNotifications(userId));
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
