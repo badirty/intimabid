@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Flame, Heart, Clock, Zap, Flag, Trash2, Timer } from 'lucide-react';
-import type { Auction, SellerSearchResult } from '@/lib/types';
+import { ArrowLeft, Flame, Heart, Clock, Zap, Flag, Trash2, Timer, MessageCircle } from 'lucide-react';
+import type { Auction, Order, SellerSearchResult } from '@/lib/types';
 import { centsToEuros, isAuctionLive } from '@/lib/format';
-import { cancelAuction, extendAuction, fetchAuctionById, fetchBidHistory } from '@/lib/db';
+import { cancelAuction, extendAuction, fetchAuctionById, fetchBidHistory, fetchOrderByAuctionId } from '@/lib/db';
 import ReportModal from '@/components/shared/ReportModal';
 import { useCountdown } from '@/hooks/useCountdown';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,6 +12,7 @@ import { fr } from 'date-fns/locale';
 import GhostLogo from '@/components/brand/GhostLogo';
 import UserAvatar from '@/components/brand/UserAvatar';
 import BidModal from '@/components/buyer/BidModal';
+import OrderChat from '@/components/chat/OrderChat';
 
 type BidEntry = {
   bidder_id: string;
@@ -56,6 +57,11 @@ export default function AuctionDetail({
   const [favving, setFavving] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [ownerBusy, setOwnerBusy] = useState(false);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [showChat, setShowChat] = useState(false);
+
+  const isParty = currentItem.status === 'sold'
+    && (currentItem.seller_id === userId || currentItem.winner_id === userId);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -82,6 +88,14 @@ export default function AuctionDetail({
     const id = setInterval(() => { refresh().catch(() => {}); }, 10000);
     return () => clearInterval(id);
   }, [live, refresh]);
+
+  // Charger la commande associée si l'enchère est sold et que l'utilisateur est partie prenante
+  useEffect(() => {
+    if (!isParty) return;
+    fetchOrderByAuctionId(currentItem.id, userId)
+      .then(setOrder)
+      .catch(() => setOrder(null));
+  }, [currentItem.id, isParty]);
 
   const openSeller = () => {
     onOpenSeller?.({
@@ -247,6 +261,47 @@ export default function AuctionDetail({
         {currentItem.description && (
           <div className="px-5 mb-4">
             <p className="text-text-2 text-sm leading-relaxed">{currentItem.description}</p>
+          </div>
+        )}
+
+        {/* Chat post-enchère (acheteur ↔ vendeur) */}
+        {isParty && order && (
+          <div className="px-5 mb-4">
+            {!showChat ? (
+              <button
+                type="button"
+                onClick={() => setShowChat(true)}
+                className="w-full ui-card p-4 flex items-center gap-3 hover:bg-white/5 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-accent" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-bold text-sm text-text">Messages</p>
+                  <p className="text-xs text-text-3">
+                    Communique avec {currentItem.seller_id === userId ? 'l\'acheteur' : 'le vendeur'} via réponses rapides
+                  </p>
+                </div>
+                <span className="text-accent text-xs font-bold">Ouvrir →</span>
+              </button>
+            ) : (
+              <div className="ui-card overflow-hidden">
+                <OrderChat order={order} userId={userId} />
+                <button
+                  type="button"
+                  onClick={() => setShowChat(false)}
+                  className="w-full py-2 text-xs text-text-3 hover:text-text-2 transition-colors border-t border-white/10"
+                >
+                  Fermer le chat
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isParty && !order && (
+          <div className="px-5 mb-4">
+            <p className="text-text-3 text-xs text-center py-4">Chargement de la conversation...</p>
           </div>
         )}
 

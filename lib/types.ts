@@ -2,6 +2,16 @@ export type Tab = 'home' | 'favorites' | 'notifications' | 'profile' | 'wallet' 
 
 export type OrderStatus = 'pending_address' | 'awaiting_shipment' | 'shipped' | 'delivered' | 'cancelled';
 
+export type MessageCode =
+  | 'BUYER_WHEN_SHIP'
+  | 'BUYER_TRACKING'
+  | 'BUYER_RECEIVED'
+  | 'BUYER_ISSUE'
+  | 'SELLER_THANKS'
+  | 'SELLER_PREPARING'
+  | 'SELLER_SHIPPED'
+  | 'SELLER_ASK_RECEIVED';
+
 export type HomeTab = 'live' | 'favorites' | 'selling' | 'ended' | 'mybids' | 'mywins' | 'mylost';
 
 export type AppMode = 'buyer' | 'seller';
@@ -120,6 +130,14 @@ export type LiveAuction = {
   seller?: string;
   status?: AuctionStatus;
 };
+
+export interface OrderMessage {
+  id: string;
+  order_id: string;
+  sender_id: string;
+  message_code: MessageCode;
+  created_at: string;
+}
 
 export interface ActiveSale {
   id: string;

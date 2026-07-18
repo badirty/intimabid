@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { signupBonusCents } from '@/lib/env';
 import { resolveProfileFromUser } from '@/lib/profile';
 import type {
-  Auction, Notification, Order, Profile, SellerSearchResult, UserAddress, UserStats, Wallet, WalletTransaction,
+  Auction, MessageCode, Notification, Order, OrderMessage, Profile, SellerSearchResult, UserAddress, UserStats, Wallet, WalletTransaction,
 } from '@/lib/types';
 import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
@@ -726,3 +726,112 @@ export async function fetchProfileById(userId: string, viewerId?: string): Promi
 }
 
 export { eurosToCents };
+
+// ─── Chat post-enchère (messages prédéfinis) ───
+
+export async function fetchOrderByAuctionId(auctionId: string, userId?: string): Promise<Order | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('auction_id', auctionId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '42P01') return null;
+    throw error;
+  }
+  if (!data) return null;
+
+  // Enrichir avec le nom de la contrepartie
+  const uid = userId ?? data.buyer_id;
+  const otherId = data.buyer_id === uid ? data.seller_id : data.buyer_id;
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', otherId)
+    .maybeSingle();
+
+  return {
+    ...(data as unknown as Order),
+    counterparty_name: profile?.display_name ?? 'Utilisateur',
+  };
+}
+
+export async function fetchOrderMessages(orderId: string): Promise<OrderMessage[]> {
+  const { data, error } = await supabase
+    .from('order_messages')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+  return data ?? [];
+}
+
+export async function sendOrderMessage(orderId: string, messageCode: MessageCode) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Non connecté');
+
+  const { error } = await supabase
+    .from('order_messages')
+    .insert({
+      order_id: orderId,
+      sender_id: user.id,
+      message_code: messageCode,
+    });
+
+  if (error) throw new Error(error.message);
+}
+
+/** Retourne les codes messages disponibles selon le rôle et le statut de la commande */
+export function getAvailableMessageCodes(role: 'buyer' | 'seller', orderStatus: string): MessageCode[] {
+  const all: Record<string, MessageCode[]> = {
+    buyer: ['BUYER_ISSUE'],
+    seller: ['SELLER_THANKS'],
+  };
+
+  // pending_address / awaiting_shipment : l'acheteur peut demander quand ça part
+  if (orderStatus === 'pending_address' || orderStatus === 'awaiting_shipment') {
+    all.buyer.push('BUYER_WHEN_SHIP');
+  }
+  // awaiting_shipment / shipped : l'acheteur peut demander le suivi
+  if (orderStatus === 'awaiting_shipment' || orderStatus === 'shipped') {
+    all.buyer.push('BUYER_TRACKING');
+  }
+  // shipped : l'acheteur peut confirmer réception
+  if (orderStatus === 'shipped') {
+    all.buyer.push('BUYER_RECEIVED');
+  }
+  // pending_address / awaiting_shipment : le vendeur peut dire qu'il prépare
+  if (orderStatus === 'pending_address' || orderStatus === 'awaiting_shipment') {
+    all.seller.push('SELLER_PREPARING');
+  }
+  // awaiting_shipment : le vendeur peut dire qu'il a expédié
+  if (orderStatus === 'awaiting_shipment') {
+    all.seller.push('SELLER_SHIPPED');
+  }
+  // shipped : le vendeur peut demander si reçu
+  if (orderStatus === 'shipped') {
+    all.seller.push('SELLER_ASK_RECEIVED');
+  }
+
+  return all[role] ?? [];
+}
+
+/** Traduit un code message en texte affiché */
+export function getMessageLabel(code: MessageCode): string {
+  const labels: Record<MessageCode, string> = {
+    BUYER_WHEN_SHIP: 'Quand penses-tu expédier la commande ?',
+    BUYER_TRACKING: 'Peux-tu me donner le numéro de suivi ?',
+    BUYER_RECEIVED: "J'ai bien reçu le colis, merci !",
+    BUYER_ISSUE: "J'ai un souci avec la réception de ma commande.",
+    SELLER_THANKS: 'Merci pour ton achat !',
+    SELLER_PREPARING: 'Je prépare ton colis.',
+    SELLER_SHIPPED: "Le colis a été expédié aujourd'hui.",
+    SELLER_ASK_RECEIVED: 'As-tu bien reçu le colis ?',
+  };
+  return labels[code];
+}
