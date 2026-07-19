@@ -13,7 +13,7 @@ export function readEnv(...keys: string[]): string | undefined {
 // Next.js inline ces valeurs au build uniquement si l'accès est explicite
 // (dot notation ou bracket avec chaîne littérale).
 
-export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 function publicEnvError(name: string): never {
   const msg =
@@ -23,7 +23,8 @@ function publicEnvError(name: string): never {
   throw new Error(msg);
 }
 
-if (!supabaseUrl) publicEnvError('NEXT_PUBLIC_SUPABASE_URL');
+if (!rawSupabaseUrl) publicEnvError('NEXT_PUBLIC_SUPABASE_URL');
+export const supabaseUrl: string = rawSupabaseUrl;
 
 export const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
