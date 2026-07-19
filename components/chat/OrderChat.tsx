@@ -36,7 +36,9 @@ export default function OrderChat({
     }
   }, [order.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   // Scroll to bottom on new messages
   useEffect(() => {

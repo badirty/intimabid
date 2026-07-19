@@ -28,6 +28,7 @@ export default function AuthPage({
     const params = new URLSearchParams(window.location.search);
     const oauthError = params.get('error_description') ?? params.get('error');
     if (oauthError) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(decodeURIComponent(oauthError.replace(/\+/g, ' ')));
       window.history.replaceState({}, '', window.location.pathname);
     }

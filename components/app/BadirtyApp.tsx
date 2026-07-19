@@ -117,7 +117,7 @@ export default function BadirtyApp({
           </div>
           <h1 className="text-xl font-bold text-text mb-2">Compte suspendu</h1>
           <p className="text-text-2 mb-2 text-sm max-w-sm">
-            L'accès à ton compte a été restreint. Si tu penses qu'il s'agit d'une erreur, contacte le support.
+            L&apos;accès à ton compte a été restreint. Si tu penses qu&apos;il s&apos;agit d&apos;une erreur, contacte le support.
           </p>
           <a href="/contact" className="text-accent text-sm hover:underline mb-8">
             Contact

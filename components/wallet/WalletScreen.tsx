@@ -123,7 +123,9 @@ export default function WalletScreen({
     }
   }, [userId]);
 
-  useEffect(() => { load({ initial: true }); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load({ initial: true }); }, [load]);
 
   useEffect(() => {
     fetchWalletTransactions(userId).then(setTransactions).catch(() => setTransactions([]));
@@ -150,6 +152,7 @@ export default function WalletScreen({
     window.history.replaceState({}, '', window.location.pathname);
 
     if (walletStatus === 'cancel') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('Paiement annulé');
       return;
     }

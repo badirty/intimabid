@@ -78,6 +78,7 @@ export default function AuctionDetail({
   }, [item.id, userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
       .catch(() => setBidHistory([]))
       .finally(() => setLoadingHistory(false));
@@ -95,7 +96,7 @@ export default function AuctionDetail({
     fetchOrderByAuctionId(currentItem.id, userId)
       .then(setOrder)
       .catch(() => setOrder(null));
-  }, [currentItem.id, isParty]);
+  }, [currentItem.id, isParty, userId]);
 
   const openSeller = () => {
     onOpenSeller?.({
@@ -199,6 +200,7 @@ export default function AuctionDetail({
       <main className="flex-1 overflow-y-auto pb-36">
         <div className={`relative h-64 sm:h-72 bg-gradient-to-br ${currentItem.image_color} flex items-center justify-center`}>
           {currentItem.image_url && (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img src={currentItem.image_url} alt={currentItem.title} className="absolute inset-0 w-full h-full object-cover" />
           )}
           {!currentItem.image_url && (

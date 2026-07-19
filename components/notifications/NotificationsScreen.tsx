@@ -40,7 +40,9 @@ export default function NotificationsScreen({
     }
   }, [userId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   const handleTap = async (n: Notification) => {
     if (!n.read) await markNotificationRead(n.id);

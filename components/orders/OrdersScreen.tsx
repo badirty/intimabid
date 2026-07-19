@@ -49,7 +49,9 @@ export default function OrdersScreen({ userId, mode }: { userId: string; mode: '
     }
   }, [userId, mode]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   useEffect(() => {
     if (mode !== 'buyer') return;

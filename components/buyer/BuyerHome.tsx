@@ -51,8 +51,11 @@ export default function BuyerHome({
     }
   }, [userId, search]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTab(initialTab === 'favorites' ? 'favorites' : 'live'); }, [initialTab]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
@@ -208,6 +211,7 @@ function AuctionCard({
     <div className="ui-card overflow-hidden cursor-pointer" onClick={onPress}>
       <div className={`relative ${featured ? 'h-52' : 'h-36'} bg-gradient-to-br ${item.image_color}`}>
         {item.image_url && (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
         )}
         {live && (

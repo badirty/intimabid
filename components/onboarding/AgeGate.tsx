@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Shield } from 'lucide-react';
 import { confirmAge } from '@/lib/db';
-import GhostLogo from '@/components/brand/GhostLogo';
 
 export default function AgeGate({ userId, onConfirmed }: { userId: string; onConfirmed: () => void }) {
   const [checked, setChecked] = useState(false);

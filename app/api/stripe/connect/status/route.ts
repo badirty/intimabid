@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   // Si RLS bloque sans cookie, retenter via le client déjà auth… sinon le setup-payout a persisté
   if (!profile?.stripe_connect_id) {
     const { createClient: createSb } = await import('@supabase/supabase-js');
-    const { supabaseUrl, supabaseAnonKey, supabaseServiceRoleKey } = await import('@/lib/env');
+    const { supabaseUrl, supabaseServiceRoleKey } = await import('@/lib/env');
     if (supabaseServiceRoleKey) {
       const admin = createSb(supabaseUrl, supabaseServiceRoleKey);
       const { data } = await admin

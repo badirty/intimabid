@@ -30,7 +30,9 @@ export default function SellerShop({
     }
   }, [seller.id, userId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col animate-slide-up left-1/2 -translate-x-1/2 w-full max-w-[430px] overflow-y-auto"
@@ -98,6 +100,7 @@ export default function SellerShop({
           >
             <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${item.image_color} shrink-0 overflow-hidden`}>
               {item.image_url && (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={item.image_url} alt="" className="w-full h-full object-cover" />
               )}
             </div>

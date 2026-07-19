@@ -14,6 +14,7 @@ function TeaserCard({ item, onTap }: { item: Auction; onTap: () => void }) {
     <button type="button" onClick={onTap} className="teaser-card ui-card overflow-hidden text-left w-full">
       <div className={`relative h-36 bg-gradient-to-br ${item.image_color}`}>
         {item.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={item.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

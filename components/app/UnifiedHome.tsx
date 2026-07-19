@@ -129,7 +129,9 @@ export default function UnifiedHome({
     }
   }, [userId, search, searchMode]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   useRealtimeRefresh(() => { load(); }, !detailAuction && !selectedSeller && !showCreate);
 
@@ -138,7 +140,10 @@ export default function UnifiedHome({
   }, []);
 
   useEffect(() => {
-    if (initialSeller) setSelectedSeller(initialSeller);
+    if (initialSeller) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedSeller(initialSeller);
+    }
   }, [initialSeller]);
 
   useEffect(() => {
@@ -154,6 +159,7 @@ export default function UnifiedHome({
 
   useEffect(() => {
     if (searchMode !== 'sellers') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSellerResults([]);
       return;
     }
@@ -607,6 +613,7 @@ export default function UnifiedHome({
                 <label className="form-label">Photo <span className="text-rose">*</span></label>
                 {imagePreview ? (
                   <div className="relative rounded-2xl overflow-hidden aspect-[16/10] max-h-[180px]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imagePreview} alt="Aperçu" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -822,7 +829,10 @@ function AuctionCard({
   return (
     <div className="ui-card overflow-hidden cursor-pointer group" onClick={onPress}>
       <div className={`relative ${featured ? 'h-56' : 'h-40'} bg-gradient-to-br ${item.image_color}`}>
-        {item.image_url && <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />}
+        {item.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
         {live && <span className="live-pill absolute top-3 right-3 flex items-center gap-1 animate-live-pulse"><Flame className="w-3 h-3" /> LIVE</span>}
         {live && buyNowPrice && (

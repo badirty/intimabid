@@ -46,7 +46,9 @@ export default function SellerDashboard({
     }
   }, [userId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); }, [load]);
 
   const launch = async () => {
     if (!title.trim()) { setError('Donne un titre à ton article'); return; }
@@ -130,6 +132,7 @@ export default function SellerDashboard({
           <div className="mb-4">
             {imagePreview ? (
               <div className="relative rounded-xl overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imagePreview} alt="Aperçu" className="w-full h-48 object-cover" />
                 <button
                   type="button"

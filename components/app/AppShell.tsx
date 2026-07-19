@@ -52,12 +52,16 @@ export default function AppShell({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('wallet')) setTab('wallet');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (params.get('wallet')) { setTab('wallet'); }
   }, []);
 
-  useEffect(() => { refreshNotifs(); refreshBalance(); }, [refreshNotifs, refreshBalance]);
+  useEffect(() => { 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refreshNotifs(); refreshBalance(); }, [refreshNotifs, refreshBalance]);
   useEffect(() => {
-    const id = setInterval(() => { refreshNotifs(); refreshBalance(); }, 30000);
+    const id = setInterval(() => { 
+      refreshNotifs(); refreshBalance(); }, 30000);
     return () => clearInterval(id);
   }, [refreshNotifs, refreshBalance]);
 

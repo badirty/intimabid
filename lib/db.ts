@@ -5,7 +5,7 @@ import { resolveProfileFromUser } from '@/lib/profile';
 import type {
   Auction, MessageCode, Notification, Order, OrderMessage, Profile, SellerSearchResult, UserAddress, UserStats, Wallet, WalletTransaction,
 } from '@/lib/types';
-import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib/format';
+import { durationHoursToEndsAt, eurosToCents } from '@/lib/format';
 
 export async function ensureUserBootstrap(userId: string, email?: string, user?: User | null) {
   const resolved = user

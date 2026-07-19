@@ -39,11 +39,6 @@ export default function AdminDashboard() {
       .catch(() => router.replace('/'));
   }, [router]);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    loadAll();
-  }, [isAdmin]);
-
   const loadAll = async () => {
     setLoading(true);
     setError(null);
@@ -104,6 +99,12 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAll();
+  }, [isAdmin]);
 
   const deleteReport = async (id: string) => {
     setBusy(true);

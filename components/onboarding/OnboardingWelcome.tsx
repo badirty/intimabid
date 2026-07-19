@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ShoppingBag, Store, Sparkles, ArrowLeftRight } from 'lucide-react';
+import { ShoppingBag, Store, ArrowLeftRight } from 'lucide-react';
 import type { PreferredMode } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import GhostLogo from '@/components/brand/GhostLogo';
