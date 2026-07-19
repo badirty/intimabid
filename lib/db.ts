@@ -219,13 +219,30 @@ export async function placeBid(auctionId: string, amountCents: number) {
     p_amount_cents: amountCents,
   });
   if (error) throw new Error(error.message);
+  sendTransactionalEvent('outbid', { auctionId, outbidAmountCents: amountCents });
   return data;
 }
 
 export async function buyNow(auctionId: string) {
   const { data, error } = await supabase.rpc('buy_now', { p_auction_id: auctionId });
   if (error) throw new Error(error.message);
+  sendTransactionalEvent('won_auction', { auctionId });
+  sendTransactionalEvent('seller_sale', { auctionId });
   return data;
+}
+
+/** Fire-and-forget : déclenche un email transactionnel sans bloquer l'UI. */
+async function sendTransactionalEvent(
+  event: 'outbid' | 'won_auction' | 'seller_sale',
+  params: Record<string, unknown>,
+) {
+  try {
+    fetch('/api/email/transactional', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, ...params }),
+    }).catch(() => {});
+  } catch { /* silencieux */ }
 }
 
 export async function fetchTopSellers(limit = 6): Promise<SellerSearchResult[]> {
@@ -678,6 +695,13 @@ export async function submitOrderAddress(orderId: string) {
 export async function markOrderShipped(orderId: string, tracking?: string) {
   const { error } = await supabase.rpc('mark_order_shipped', { p_order_id: orderId, p_tracking: tracking ?? '' });
   if (error) throw new Error(error.message);
+  try {
+    fetch('/api/email/transactional', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'order_shipped', orderId, trackingNumber: tracking }),
+    }).catch(() => {});
+  } catch { /* silencieux */ }
 }
 
 export async function confirmOrderDelivered(orderId: string) {
