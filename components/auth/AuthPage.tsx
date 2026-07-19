@@ -112,8 +112,8 @@ export default function AuthPage({
           <p className="text-text-2 text-sm mt-2">Enchères privées · vibe ghost</p>
         </div>
 
-        <div className="ui-card p-6">
-          <h2 className="font-bold text-lg mb-1">
+        <div className="bento-card p-6">
+          <h2 className="font-bold text-lg mb-1" style={{ fontFamily: 'var(--font-display)' }}>
             {view === 'login' ? 'Connexion' : view === 'signup' ? 'Inscription' : 'Mot de passe oublié'}
           </h2>
           <p className="text-text-2 text-xs mb-5">
@@ -124,19 +124,19 @@ export default function AuthPage({
             <>
               <div className="space-y-2">
                 <button onClick={() => signInWithProvider('google')} disabled={!!loading}
-                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
+                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-all duration-200 disabled:opacity-50 active:scale-[0.98]">
                   <GoogleIcon /> Google
                 </button>
                 <button onClick={() => signInWithProvider('x')} disabled={!!loading}
-                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-colors disabled:opacity-50">
+                  className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-card-muted transition-all duration-200 disabled:opacity-50 active:scale-[0.98]">
                   <XIcon /> X
                 </button>
               </div>
 
               <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-text-3 text-xs">ou</span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                <span className="text-text-3 text-xs font-medium">ou</span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
               </div>
             </>
           )}
@@ -153,12 +153,12 @@ export default function AuthPage({
             {success && <p className="alert-success">{success}</p>}
             {view === 'forgot' ? (
               <button onClick={handleForgotPassword} disabled={!!loading}
-                className="btn-buyer w-full py-3.5 text-sm">
+                className="btn-accent w-full py-3.5 text-sm">
                 {loading === 'forgot' ? '...' : 'Envoyer le lien'}
               </button>
             ) : (
               <button onClick={handleEmailAuth} disabled={!!loading}
-                className="btn-buyer w-full py-3.5 text-sm">
+                className="btn-accent w-full py-3.5 text-sm shadow-lg shadow-accent/20">
                 {loading === 'email' ? '...' : view === 'login' ? 'Se connecter' : 'Créer un compte'}
               </button>
             )}
@@ -168,7 +168,7 @@ export default function AuthPage({
             <button
               type="button"
               onClick={() => { setView('forgot'); setError(null); setSuccess(null); }}
-              className="w-full mt-3 text-xs text-text-3 hover:text-accent"
+              className="w-full mt-3 text-xs text-text-3 hover:text-accent transition-colors"
             >
               Mot de passe oublié ?
             </button>
@@ -179,7 +179,7 @@ export default function AuthPage({
               type="button"
               onClick={resendConfirmation}
               disabled={!!loading}
-              className="w-full mt-3 text-xs text-accent font-semibold"
+              className="w-full mt-3 text-xs text-accent font-semibold hover:text-accent/80 transition-colors"
             >
               Renvoyer l&apos;e-mail de confirmation
             </button>
@@ -187,21 +187,21 @@ export default function AuthPage({
 
           {view === 'forgot' ? (
             <button onClick={() => { setView('login'); setError(null); setSuccess(null); }}
-              className="w-full mt-4 text-sm text-buyer font-semibold">
+              className="w-full mt-4 text-sm text-accent font-semibold hover:text-accent/80 transition-colors">
               Retour à la connexion
             </button>
           ) : (
             <button onClick={() => { setView(view === 'login' ? 'signup' : 'login'); setError(null); setSuccess(null); }}
-              className="w-full mt-4 text-sm text-buyer font-semibold">
+              className="w-full mt-4 text-sm text-accent font-semibold hover:text-accent/80 transition-colors">
               {view === 'login' ? "Pas de compte ? S'inscrire" : 'Déjà membre ?'}
             </button>
           )}
 
           <p className="text-center text-[10px] text-text-3 mt-4 leading-relaxed">
             En continuant, tu acceptes nos{' '}
-            <a href="/terms" className="text-accent hover:underline">CGU</a>
+            <a href="/terms" className="text-accent hover:underline transition-colors">CGU</a>
             {' '}et notre{' '}
-            <a href="/privacy" className="text-accent hover:underline">politique de confidentialité</a>.
+            <a href="/privacy" className="text-accent hover:underline transition-colors">politique de confidentialité</a>.
           </p>
         </div>
       </div>

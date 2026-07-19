@@ -163,7 +163,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={goHome}
-            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 hover:opacity-80 transition-all duration-200 active:scale-95"
           >
             <div className="ghost-logo-wrap w-8 h-8 rounded-xl flex items-center justify-center">
               <GhostLogo size={22} />
@@ -175,7 +175,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={goWallet}
-            className="text-xs font-bold text-white/70 bg-white/10 px-3 py-1.5 rounded-full hover:bg-white/15 transition-colors tabular-nums"
+            className="text-xs font-bold text-white/80 bg-white/8 hover:bg-accent/20 backdrop-blur-sm px-3 py-1.5 rounded-full hover:shadow-glow transition-all duration-200 tabular-nums border border-white/5 hover:border-accent/30"
           >
             {centsToEuros(balanceCents)} €
           </button>

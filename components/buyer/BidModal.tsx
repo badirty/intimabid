@@ -45,21 +45,24 @@ export default function BidModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="ui-card w-full max-w-[430px] p-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-bold text-lg mb-1">Offre personnalisée</h3>
-        <p className="text-text-2 text-sm mb-4 truncate">{title}</p>
-        <label className="text-xs text-text-3 font-semibold">Montant (€)</label>
-        <input
-          type="number"
-          step="0.01"
-          min={minCents / 100}
-          value={euros}
-          onChange={(e) => setEuros(e.target.value)}
-          className="search-bar w-full px-4 py-3 text-sm mt-1 mb-3 outline-none"
-        />
-        <p className="text-text-3 text-xs mb-4">Minimum : {centsToEuros(minCents)} €</p>
-        {error && <p className="alert-error mb-3">{error}</p>}
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="ui-card-raised w-full max-w-[430px] p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-bold text-lg mb-1" style={{ fontFamily: 'var(--font-display)' }}>Offre personnalisée</h3>
+        <p className="text-text-2 text-sm mb-5 truncate">{title}</p>
+        <label className="form-label">Montant</label>
+        <div className="relative mb-1">
+          <input
+            type="number"
+            step="0.01"
+            min={minCents / 100}
+            value={euros}
+            onChange={(e) => setEuros(e.target.value)}
+            className="search-bar w-full px-4 py-3.5 text-sm outline-none pr-10"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 text-sm font-bold">€</span>
+        </div>
+        <p className="text-text-3 text-xs mb-5 font-medium">Minimum : <span className="text-text-2">{centsToEuros(minCents)} €</span></p>
+        {error && <p className="alert-error mb-4">{error}</p>}
         {needsWallet && onWalletNeeded && (
           <button
             type="button"
@@ -70,12 +73,12 @@ export default function BidModal({
             Recharger le portefeuille
           </button>
         )}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-border text-sm font-semibold text-text-2">
+        <div className="flex gap-3">
+          <button onClick={onClose} className="btn-soft flex-1 py-3.5 text-sm">
             Annuler
           </button>
-          <button onClick={submit} disabled={loading} className="btn-buyer flex-1 py-3 text-sm">
-            {loading ? '...' : 'Confirmer'}
+          <button onClick={submit} disabled={loading} className="btn-buyer flex-[1.5] py-3.5 text-sm">
+            {loading ? '...' : 'Confirmer l\'offre'}
           </button>
         </div>
       </div>

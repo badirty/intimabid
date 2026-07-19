@@ -338,7 +338,7 @@ export default function UnifiedHome({
                 setSearchMode(mode);
                 if (mode === 'items') setSellerResults([]);
               }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
                 searchMode === mode
                   ? 'bg-accent text-white shadow-sm'
                   : 'text-white/50 hover:text-white/70'
@@ -360,7 +360,7 @@ export default function UnifiedHome({
           />
         </div>
 
-        {toast && <div className="bg-accent/10 text-accent text-sm font-bold px-4 py-2.5 rounded-2xl text-center border border-accent/20">{toast}</div>}
+        {toast && <div className="toast-accent animate-toast-in">{toast}</div>}
 
         {isSellerMode && !sellerQuery && topSellers.length > 0 && (
           <div>
@@ -373,7 +373,7 @@ export default function UnifiedHome({
                   key={seller.id}
                   type="button"
                   onClick={() => openSeller(seller)}
-                  className="ui-card w-full p-4 flex items-center gap-3 text-left hover:border-accent/30 transition-colors"
+                  className="bento-card w-full p-4 flex items-center gap-3 text-left"
                 >
                   <UserAvatar src={seller.avatar_url} name={seller.display_name} size={48} rounded="rounded-xl" />
                   <div className="flex-1 min-w-0">
@@ -390,8 +390,8 @@ export default function UnifiedHome({
         )}
 
         {isSellerMode && !sellerQuery && topSellers.length === 0 && (
-          <div className="ui-card p-6 text-center">
-            <Store className="w-8 h-8 text-accent mx-auto mb-2" />
+          <div className="bento-card p-6 text-center">
+            <Store className="w-8 h-8 text-accent mx-auto mb-2 opacity-60" />
             <p className="font-bold text-text text-sm">Trouver un vendeur</p>
             <p className="text-text-3 text-xs mt-1">Tape son pseudo pour voir sa boutique</p>
           </div>
@@ -440,34 +440,34 @@ export default function UnifiedHome({
         )}
 
         {!isSellerMode && !loading && tab === 'live' && liveItems.length === 0 && (
-          <div className="ui-card p-10 text-center">
-            <p className="text-4xl mb-3">🕯️</p>
+          <div className="empty-state bento-card">
+            <p className="text-4xl mb-1">🕯️</p>
             <p className="font-bold text-text text-lg">Aucune enchère live</p>
-            <p className="text-text-3 text-sm mt-2">Lance la première enchère avec le bouton +</p>
+            <p className="text-text-3 text-sm">Lance la première enchère avec le bouton +</p>
           </div>
         )}
 
         {!isSellerMode && !loading && tab === 'favorites' && favoriteItems.length === 0 && (
-          <div className="ui-card p-10 text-center">
-            <p className="text-4xl mb-3">💜</p>
+          <div className="empty-state bento-card">
+            <span className="text-4xl mb-1">💜</span>
             <p className="font-bold text-text text-lg">Aucun favori</p>
-            <p className="text-text-3 text-sm mt-2">Tape le cœur sur une enchère pour la retrouver ici</p>
+            <p className="text-text-3 text-sm">Tape le cœur sur une enchère pour la retrouver ici</p>
           </div>
         )}
 
         {!isSellerMode && !loading && tab === 'selling' && mySales.length === 0 && (
-          <div className="ui-card p-10 text-center">
-            <p className="text-4xl mb-3">📦</p>
+          <div className="empty-state bento-card">
+            <span className="text-4xl mb-1">📦</span>
             <p className="font-bold text-text text-lg">Aucune vente en cours</p>
-            <p className="text-text-3 text-sm mt-2">Crée une enchère pour commencer à vendre</p>
+            <p className="text-text-3 text-sm">Crée une enchère pour commencer à vendre</p>
           </div>
         )}
 
         {!isSellerMode && !loading && tab === 'ended' && endedItems.length === 0 && (
-          <div className="ui-card p-10 text-center">
-            <p className="text-4xl mb-3">✨</p>
+          <div className="empty-state bento-card">
+            <span className="text-4xl mb-1">✨</span>
             <p className="font-bold text-text text-lg">Aucune vente terminée</p>
-            <p className="text-text-3 text-sm mt-2">Les ventes terminées apparaîtront ici</p>
+            <p className="text-text-3 text-sm">Les ventes terminées apparaîtront ici</p>
           </div>
         )}
 
@@ -522,7 +522,7 @@ export default function UnifiedHome({
         ))}
 
         {!isSellerMode && !loading && tab === 'mybids' && myActiveBids.length === 0 && (
-          <div className="ui-card p-10 text-center">
+          <div className="ui-card p-6 text-center">
             <p className="font-bold text-text">Aucune offre active</p>
             <p className="text-text-3 text-sm mt-2">Enchéris sur une vente live</p>
           </div>
@@ -827,7 +827,7 @@ function AuctionCard({
   };
 
   return (
-    <div className="ui-card overflow-hidden cursor-pointer group" onClick={onPress}>
+    <div className="bento-card cursor-pointer group" onClick={onPress}>
       <div className={`relative ${featured ? 'h-56' : 'h-40'} bg-gradient-to-br ${item.image_color}`}>
         {item.image_url && (
           // eslint-disable-next-line @next/next/no-img-element

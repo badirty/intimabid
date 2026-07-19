@@ -155,8 +155,8 @@ export default function AuctionDetail({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col animate-slide-up left-1/2 -translate-x-1/2 w-full max-w-[430px]"
-      style={{ background: 'linear-gradient(180deg, #06040a 0%, #0d0b18 100%)' }}
+      className="fixed inset-0 z-[60] flex flex-col animate-scale-in left-1/2 -translate-x-1/2 w-full max-w-[430px]"
+      style={{ background: 'linear-gradient(180deg, #050208 0%, #0c0918 100%)' }}
     >
       <div
         className="header-dark px-4 py-3 flex items-center gap-3 shrink-0"
@@ -165,14 +165,14 @@ export default function AuctionDetail({
         <button
           type="button"
           onClick={onClose}
-          className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+          className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-all duration-200 active:scale-90"
         >
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-white font-bold text-sm truncate">{currentItem.title}</p>
           {onOpenSeller ? (
-            <button type="button" onClick={openSeller} className="text-accent text-xs font-semibold hover:underline">
+            <button type="button" onClick={openSeller} className="text-accent text-xs font-semibold hover:underline transition-colors">
               @{currentItem.seller_name}
             </button>
           ) : (
@@ -183,7 +183,7 @@ export default function AuctionDetail({
           <button
             type="button"
             onClick={() => setShowReport(true)}
-            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-all duration-200"
           >
             <Flag className="w-4 h-4 text-white/70" />
           </button>
@@ -191,9 +191,9 @@ export default function AuctionDetail({
         <button
           onClick={handleFavorite}
           disabled={favving}
-          className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+          className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-all duration-200 active:scale-90"
         >
-          <Heart className={`w-5 h-5 ${currentItem.is_favorite ? 'fill-red-400 text-red-400' : 'text-white'}`} />
+          <Heart className={`w-5 h-5 transition-all duration-200 ${currentItem.is_favorite ? 'fill-red-400 text-red-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.5)]' : 'text-white'}`} />
         </button>
       </div>
 
@@ -273,7 +273,7 @@ export default function AuctionDetail({
               <button
                 type="button"
                 onClick={() => setShowChat(true)}
-                className="w-full ui-card p-4 flex items-center gap-3 hover:bg-white/5 transition-colors"
+                className="w-full bento-card p-4 flex items-center gap-3"
               >
                 <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
                   <MessageCircle className="w-5 h-5 text-accent" />
@@ -287,7 +287,7 @@ export default function AuctionDetail({
                 <span className="text-accent text-xs font-bold">Ouvrir →</span>
               </button>
             ) : (
-              <div className="ui-card overflow-hidden">
+              <div className="bento-card overflow-hidden">
                 <OrderChat order={order} userId={userId} />
                 <button
                   type="button"
@@ -308,13 +308,13 @@ export default function AuctionDetail({
         )}
 
         <div className="px-5 mb-4">
-          <h3 className="font-extrabold text-sm uppercase tracking-wider text-text-2 mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4" /> Historique des offres
+          <h3 className="font-extrabold text-xs uppercase tracking-[0.1em] text-text-2 mb-3 flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5" /> Historique des offres
           </h3>
           {loadingHistory ? (
             <p className="text-text-3 text-sm py-4 text-center">Chargement...</p>
           ) : bidHistory.length === 0 ? (
-            <div className="ui-card p-4 text-center">
+            <div className="bento-card p-4 text-center">
               <p className="text-text-3 text-sm">Aucune offre pour le moment</p>
               <p className="text-text-3 text-xs mt-1">Sois le premier à enchérir !</p>
             </div>
@@ -333,7 +333,7 @@ export default function AuctionDetail({
                       <button
                         type="button"
                         onClick={() => openBidderShop(bid)}
-                        className="font-bold text-sm text-text truncate hover:text-accent"
+                        className="font-bold text-sm text-text truncate hover:text-accent transition-colors"
                       >
                         @{bid.bidder_name}
                       </button>
@@ -341,7 +341,7 @@ export default function AuctionDetail({
                       <span className="font-bold text-sm text-text truncate">@{bid.bidder_name}</span>
                     )}
                     {bid === bidHistory[0] && (
-                      <span className="text-[10px] bg-buyer text-white px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                      <span className="text-[10px] bg-gradient-to-r from-accent to-pink text-white px-1.5 py-0.5 rounded-full font-bold shrink-0 shadow-sm">
                         TOP
                       </span>
                     )}

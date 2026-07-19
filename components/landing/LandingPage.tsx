@@ -48,12 +48,12 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
         className="flex-1 flex flex-col overflow-y-auto relative z-10"
         style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="text-center px-6 pt-12 pb-6 animate-slide-up">
+        <div className="text-center px-6 pt-14 pb-6 animate-slide-up">
           <div className="ghost-logo-wrap w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 animate-ghost-float">
             <GhostLogo size={64} />
           </div>
           <h1
-            className="text-5xl font-extrabold text-text mb-3 tracking-tight"
+            className="text-5xl font-extrabold text-text mb-3 tracking-tight leading-none"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             badirty
@@ -61,29 +61,30 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
           <p className="text-text-2 text-base font-semibold leading-relaxed max-w-xs mx-auto">
             Enchères intimes en direct.
             <br />
-            <span className="text-accent">Privé.</span>{' '}
-            <span className="text-pink">Addictif.</span>
+            <span className="text-accent animate-neon">Privé.</span>{' '}
+            <span className="text-pink animate-live-pulse">Addictif.</span>
           </p>
         </div>
 
         {livePreview.length > 0 && (
-          <div className="px-4 mb-6 animate-slide-up" style={{ animationDelay: '0.05s' }}>
-            <p className="text-xs text-text-3 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-rose" /> En ce moment
+          <div className="px-4 mb-8 animate-slide-up delay-1">
+            <p className="text-[10px] text-text-3 uppercase tracking-[0.12em] font-bold mb-3 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose animate-live-pulse" />
+              En ce moment
             </p>
             <div className="teaser-scroll flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
               {livePreview.map((item) => (
                 <TeaserCard key={item.id} item={item} onTap={() => onNavigate('signup')} />
               ))}
             </div>
-            <p className="text-text-3 text-[11px] text-center mt-3">
+            <p className="text-text-3 text-[11px] text-center mt-3 font-medium">
               Inscris-toi pour enchérir en un clic
             </p>
           </div>
         )}
 
-        <div className="px-4 mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          <p className="text-xs text-text-3 uppercase tracking-widest font-bold text-center mb-5">
+        <div className="px-4 mb-8 animate-slide-up delay-2">
+          <p className="text-[10px] text-text-3 uppercase tracking-[0.12em] font-bold text-center mb-5">
             Comment ça marche
           </p>
           <div className="grid grid-cols-3 gap-3">
@@ -92,20 +93,20 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
               { icon: Zap, label: 'Enchéris', sub: 'En un clic', color: 'bg-pink/10 text-pink' },
               { icon: Shield, label: 'Reçois', sub: 'Paiement sécurisé', color: 'bg-rose/10 text-rose' },
             ].map(({ icon: Icon, label, sub, color }) => (
-              <div key={label} className="ui-card p-4 text-center">
-                <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mx-auto mb-2`}>
+              <div key={label} className="bento-card p-4 text-center">
+                <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center mx-auto mb-2.5`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <p className="font-bold text-sm text-text">{label}</p>
-                <p className="text-[11px] text-text-3 mt-0.5">{sub}</p>
+                <p className="text-[11px] text-text-3 mt-0.5 leading-tight">{sub}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="px-4 space-y-3 mb-10 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          <div className="ui-card p-5 flex gap-4 items-start">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent to-pink flex items-center justify-center shrink-0">
+        <div className="px-4 space-y-3 mb-10 animate-slide-up delay-3">
+          <div className="bento-card p-5 flex gap-4 items-start">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent to-pink flex items-center justify-center shrink-0 shadow-lg shadow-accent/20">
               <ShoppingBag className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -116,8 +117,8 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
             </div>
           </div>
 
-          <div className="ui-card p-5 flex gap-4 items-start">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink to-rose flex items-center justify-center shrink-0">
+          <div className="bento-card p-5 flex gap-4 items-start">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink to-rose flex items-center justify-center shrink-0 shadow-lg shadow-pink/20">
               <Store className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -129,17 +130,17 @@ export default function LandingPage({ onNavigate }: { onNavigate: (view: 'login'
           </div>
         </div>
 
-        <div className="mt-auto px-4 pb-8 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '0.35s' }}>
+        <div className="mt-auto px-4 pb-8 flex flex-col gap-3 animate-slide-up delay-4">
           <button
             onClick={() => onNavigate('signup')}
-            className="btn-accent w-full py-4 text-base flex items-center justify-center gap-2"
+            className="btn-accent w-full py-4 text-base flex items-center justify-center gap-2 shadow-xl shadow-accent/20"
           >
             <Sparkles className="w-4 h-4" />
             Créer un compte gratuit
           </button>
           <button
             onClick={() => onNavigate('login')}
-            className="btn-ghost w-full py-4 text-base"
+            className="btn-soft w-full py-4 text-base"
           >
             J&apos;ai déjà un compte
           </button>

@@ -31,17 +31,19 @@ export default function BottomNav({
             <button
               key={tab}
               onClick={() => onChange(tab)}
-              className={`relative flex flex-col items-center gap-0.5 py-1.5 px-3 transition-colors ${
+              className={`relative flex flex-col items-center gap-0.5 py-1.5 px-3 transition-all duration-200 hover:scale-105 ${
                 isActive ? 'nav-item-active' : 'nav-item'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              {tab === 'notifications' && notifCount > 0 && (
-                <span className="absolute top-0 right-1 min-w-[16px] h-4 bg-rose text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                  {notifCount > 9 ? '9+' : notifCount}
-                </span>
-              )}
-              <span className="text-[9px] font-semibold">{label}</span>
+              <div className="relative">
+                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]' : ''}`} />
+                {tab === 'notifications' && notifCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 bg-gradient-to-r from-rose to-pink text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1 shadow-lg shadow-rose/30">
+                    {notifCount > 9 ? '9+' : notifCount}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[9px] font-semibold transition-all duration-200 ${isActive ? 'tracking-wider' : ''}`}>{label}</span>
             </button>
           );
         })}
