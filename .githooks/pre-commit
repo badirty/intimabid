@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Pre-commit hook — bloque les commits contenant des secrets
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Patterns de secrets à détecter
+PATTERNS=(
+  # Stripe secret keys (sk_live)
+  'sk_live_[0-9a-zA-Z]{24,}'
+  # Stripe restricted keys (rk_live)
+  'rk_live_[0-9a-zA-Z]{24,}'
+  # Supabase service role (sb_secret_ ou eyJ...)
+  'sb_secret_[0-9a-zA-Z_-]{20,}'
+  # AWS / GCP / generic secret keys
+  'AKIA[0-9A-Z]{16}'
+  'AIza[0-9A-Za-z\-_]{35}'
+  # Private keys
+  '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
+  # Generic API keys (heuristique : longue chaîne hex ou base64 dans du code)
+  'api[_-]?key\s*[:=]\s*["'"'"'][A-Za-z0-9_\-]{20,}["'"'"']'
+  'secret\s*[:=]\s*["'"'"'][A-Za-z0-9_\-]{20,}["'"'"']'
+  # Resend API keys
+  're_[0-9a-zA-Z]{20,}'
+)
+
+# env files (ne devraient jamais être commités)
+
+FOUND=0
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+echo -e "${YELLOW}🔍 Vérification des secrets dans les fichiers stagés...${NC}"
+
+for pattern in "${PATTERNS[@]}"; do
+  while IFS= read -r file; do
+    # Ignorer ce hook lui-même
+    if [[ "$file" == ".githooks/"* ]] || [[ "$file" == ".git/"* ]]; then
+      continue
+    fi
+
+    # Vérifier le diff stagé uniquement
+    if git diff --cached -- "$file" | grep -qinE "$pattern" 2>/dev/null; then
+      MATCHES=$(git diff --cached -- "$file" | grep -inE "$pattern" 2>/dev/null || true)
+      echo -e "${RED}❌ SECRET DÉTECTÉ dans $file :${NC}"
+      echo "$MATCHES"
+      FOUND=1
+    fi
+  done <<< "$STAGED_FILES"
+done
+
+# Vérifier aussi les fichiers .env stagés (ne devraient jamais l'être)
+while IFS= read -r file; do
+  if [[ "$file" == *".env"* ]] && [[ "$file" != ".env.local.example" ]] && [[ "$file" != ".githooks/"* ]]; then
+    echo -e "${RED}❌ FICHIER .ENV INTERDIT : $file${NC}"
+    FOUND=1
+  fi
+done <<< "$STAGED_FILES"
+
+if [ "$FOUND" -eq 1 ]; then
+  echo ""
+  echo -e "${RED}⛔ Commit bloqué — des secrets ont été détectés.${NC}"
+  echo "   Si c'est un faux positif, utilise : git commit --no-verify"
+  exit 1
+fi
+
+echo -e "✅ Aucun secret détecté."
+exit 0

@@ -1,6 +1,7 @@
 export {
   supabaseUrl,
   supabaseAnonKey,
+  ensureAnonKey,
   stripePublishableKey,
   stripeSecretKey,
   stripeWebhookSecret,

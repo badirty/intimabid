@@ -26,9 +26,6 @@ export async function GET() {
       profiles_error: profilesError?.message ?? null,
       auth_users_count: authUsers?.users?.length ?? 0,
       auth_error: authError?.message ?? null,
-      service_role_key_preview: process.env.SUPABASE_SERVICE_ROLE_KEY
-        ? `${process.env.SUPABASE_SERVICE_ROLE_KEY.slice(0, 8)}...`
-        : null,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur inconnue';
