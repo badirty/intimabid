@@ -5,6 +5,7 @@ import { ArrowLeft, Store } from 'lucide-react';
 import type { Auction, SellerSearchResult } from '@/lib/types';
 import { fetchLiveAuctionsBySeller } from '@/lib/db';
 import UserAvatar from '@/components/brand/UserAvatar';
+import { XIcon } from '@/components/icons';
 
 export default function SellerShop({
   seller,
@@ -65,6 +66,17 @@ export default function SellerShop({
             </p>
             {seller.bio && (
               <p className="text-text-2 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{seller.bio}</p>
+            )}
+            {seller.x_username && (
+              <a
+                href={`https://x.com/${seller.x_username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-2 text-sm text-text-2 hover:text-accent transition-colors"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+                <span>@{seller.x_username}</span>
+              </a>
             )}
           </div>
         </div>

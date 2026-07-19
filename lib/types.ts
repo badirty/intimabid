@@ -67,6 +67,8 @@ export interface Profile {
   avatar_url: string | null;
   bio?: string | null;
   bio_public?: boolean;
+  x_username?: string | null;
+  x_public?: boolean;
   created_at?: string;
 }
 
@@ -77,6 +79,7 @@ export interface SellerSearchResult {
   total_sales: number;
   avatar_url?: string | null;
   bio?: string | null;
+  x_username?: string | null;
 }
 
 export interface Order {

@@ -19,9 +19,16 @@ export function resolveProfileFromUser(user: Pick<User, 'email' | 'user_metadata
     (typeof meta.about === 'string' && meta.about.trim()) ||
     null;
 
+  const oauthXUsername =
+    (typeof meta.user_name === 'string' && meta.user_name.trim()) ||
+    (typeof meta.screen_name === 'string' && meta.screen_name.trim()) ||
+    (typeof meta.preferred_username === 'string' && meta.preferred_username.trim()) ||
+    null;
+
   return {
     display_name: oauthName ?? emailName,
     avatar_url: avatarUrl,
     bio: oauthBio,
+    x_username: oauthXUsername,
   };
 }

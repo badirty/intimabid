@@ -10,10 +10,10 @@ import { durationDaysToEndsAt, durationHoursToEndsAt, eurosToCents } from '@/lib
 export async function ensureUserBootstrap(userId: string, email?: string, user?: User | null) {
   const resolved = user
     ? resolveProfileFromUser(user)
-    : { display_name: email?.split('@')[0] ?? 'user', avatar_url: null as string | null, bio: null as string | null };
+    : { display_name: email?.split('@')[0] ?? 'user', avatar_url: null as string | null, bio: null as string | null, x_username: null as string | null };
   const { data: existing } = await supabase
     .from('profiles')
-    .select('display_name, avatar_url, bio')
+    .select('display_name, avatar_url, bio, x_username')
     .eq('id', userId)
     .maybeSingle();
 
@@ -23,6 +23,7 @@ export async function ensureUserBootstrap(userId: string, email?: string, user?:
       display_name: existing?.display_name ?? resolved.display_name,
       avatar_url: resolved.avatar_url ?? existing?.avatar_url ?? null,
       bio: existing?.bio ?? resolved.bio ?? null,
+      x_username: existing?.x_username ?? resolved.x_username ?? null,
     },
     { onConflict: 'id' },
   );
@@ -466,7 +467,7 @@ export async function fetchAuctionById(auctionId: string, userId?: string): Prom
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, avatar_url, bio, bio_public, created_at')
+    .select('id, display_name, avatar_url, bio, bio_public, x_username, x_public, created_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -491,7 +492,7 @@ export async function updateDisplayName(userId: string, displayName: string) {
 
 export async function updateProfileSettings(
   userId: string,
-  patch: { bio?: string; bio_public?: boolean },
+  patch: { bio?: string; bio_public?: boolean; x_username?: string; x_public?: boolean },
 ) {
   const row: Record<string, unknown> = { id: userId };
   if (patch.bio !== undefined) {
@@ -500,6 +501,12 @@ export async function updateProfileSettings(
     row.bio = bio || null;
   }
   if (patch.bio_public !== undefined) row.bio_public = patch.bio_public;
+  if (patch.x_username !== undefined) {
+    const xu = patch.x_username.trim().replace(/^@+/, '');
+    if (xu.length > 30) throw new Error('Nom X maximum 30 caractères');
+    row.x_username = xu || null;
+  }
+  if (patch.x_public !== undefined) row.x_public = patch.x_public;
 
   const { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
   if (error) throw new Error(error.message);
@@ -536,11 +543,13 @@ export async function fetchSellerStats(userId: string, viewerId?: string) {
   const profile = await fetchProfile(userId);
   const isOwner = viewerId === userId;
   const showBio = isOwner || !!profile?.bio_public;
+  const showX = isOwner || !!profile?.x_public;
   return {
     id: userId,
     display_name: profile?.display_name ?? 'Vendeur',
     avatar_url: profile?.avatar_url ?? null,
     bio: showBio ? profile?.bio ?? null : null,
+    x_username: showX ? profile?.x_username ?? null : null,
     live_count,
     total_sales,
   } satisfies SellerSearchResult;

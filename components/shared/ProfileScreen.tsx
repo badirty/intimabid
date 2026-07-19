@@ -8,6 +8,7 @@ import { fetchProfile, fetchSellerStats, fetchUserStats, updateDisplayName, upda
 import { resolveProfileFromUser } from '@/lib/profile';
 import type { SellerSearchResult } from '@/lib/types';
 import UserAvatar from '@/components/brand/UserAvatar';
+import { XIcon } from '@/components/icons';
 
 export default function ProfileScreen({
   user,
@@ -30,10 +31,13 @@ export default function ProfileScreen({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(oauth.avatar_url);
   const [bio, setBio] = useState('');
   const [bioPublic, setBioPublic] = useState(false);
+  const [xUsername, setXUsername] = useState('');
+  const [xPublic, setXPublic] = useState(false);
   const [stats, setStats] = useState({ bids_count: 0, sales_count: 0, balance_cents: 0 });
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftBio, setDraftBio] = useState('');
+  const [draftXUsername, setDraftXUsername] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -54,8 +58,10 @@ export default function ProfileScreen({
       else if (oauth.avatar_url) setAvatarUrl(oauth.avatar_url);
       setBio(p?.bio ?? oauth.bio ?? '');
       setBioPublic(p?.bio_public ?? false);
+      setXUsername(p?.x_username ?? oauth.x_username ?? '');
+      setXPublic(p?.x_public ?? false);
     }).catch(() => {});
-  }, [userId, oauth.avatar_url, oauth.bio]);
+  }, [userId, oauth.avatar_url, oauth.bio, oauth.x_username]);
 
   useEffect(() => {
     fetchUserStats(userId).then(setStats);
@@ -66,9 +72,10 @@ export default function ProfileScreen({
     setError(null);
     try {
       await updateDisplayName(userId, draftName);
-      await updateProfileSettings(userId, { bio: draftBio });
+      await updateProfileSettings(userId, { bio: draftBio, x_username: draftXUsername });
       setProfileName(draftName.trim());
       setBio(draftBio.trim());
+      setXUsername(draftXUsername.trim().replace(/^@+/, ''));
       setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -87,11 +94,23 @@ export default function ProfileScreen({
     }
   };
 
+  const toggleXPublic = async () => {
+    const next = !xPublic;
+    setXPublic(next);
+    try {
+      await updateProfileSettings(userId, { x_public: next });
+    } catch {
+      setXPublic(!next);
+    }
+  };
+
   const openMyShop = async () => {
     if (!onOpenShop) return;
     const seller = await fetchSellerStats(userId, userId);
     onOpenShop(seller);
   };
+
+  const xUrl = xUsername ? `https://x.com/${xUsername.replace(/^@+/, '')}` : null;
 
   return (
     <div className="animate-slide-up px-4 py-6">
@@ -122,6 +141,14 @@ export default function ProfileScreen({
               placeholder="Ta bio (importée depuis X ou Google si connecté)"
             />
             <p className="text-[10px] text-text-3">{draftBio.length}/160</p>
+            <label className="text-[10px] uppercase tracking-wider text-text-3 font-bold">Nom X (Twitter)</label>
+            <input
+              value={draftXUsername}
+              onChange={(e) => setDraftXUsername(e.target.value)}
+              maxLength={30}
+              className="search-bar w-full px-4 py-2.5 text-sm"
+              placeholder="Ton @ sur X (importé si connecté avec X)"
+            />
             {error && <p className="text-rose text-xs">{error}</p>}
             <div className="flex gap-2 justify-center pt-1">
               <button
@@ -152,6 +179,7 @@ export default function ProfileScreen({
                 onClick={() => {
                   setDraftName(displayName);
                   setDraftBio(bio);
+                  setDraftXUsername(xUsername);
                   setEditing(true);
                 }}
                 className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-3 hover:text-accent"
@@ -165,15 +193,27 @@ export default function ProfileScreen({
             ) : (
               <p className="text-text-3 text-sm mt-3">Ajoute une bio pour personnaliser ton profil</p>
             )}
+            {xUrl && (
+              <a
+                href={xUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-3 text-sm text-text-2 hover:text-accent transition-colors"
+              >
+                <XIcon className="w-4 h-4" />
+                <span>@{xUsername}</span>
+              </a>
+            )}
           </>
         )}
       </div>
 
       {!editing && (
+        <>
         <button
           type="button"
           onClick={toggleBioPublic}
-          className="ui-card w-full p-4 mb-4 flex items-center justify-between gap-3 text-left"
+          className="ui-card w-full p-4 mb-3 flex items-center justify-between gap-3 text-left"
         >
           <div>
             <p className="font-bold text-sm">Bio visible sur ma boutique</p>
@@ -188,6 +228,26 @@ export default function ProfileScreen({
             />
           </div>
         </button>
+
+        <button
+          type="button"
+          onClick={toggleXPublic}
+          className="ui-card w-full p-4 mb-4 flex items-center justify-between gap-3 text-left"
+        >
+          <div>
+            <p className="font-bold text-sm">Lien X (Twitter) visible sur ma boutique</p>
+            <p className="text-text-3 text-xs mt-0.5">{xUsername ? `@${xUsername} sera visible` : "Ajoute ton nom X dans l'édition du profil"}</p>
+          </div>
+          <div
+            className={`w-11 h-6 rounded-full shrink-0 transition-colors ${xPublic ? 'bg-accent' : 'bg-white/10'}`}
+            aria-hidden
+          >
+            <div
+              className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${xPublic ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+            />
+          </div>
+        </button>
+        </>
       )}
 
       <button
